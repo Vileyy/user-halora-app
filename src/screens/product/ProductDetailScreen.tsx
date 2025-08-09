@@ -5,10 +5,19 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
+  TouchableOpacity,
+  Share,
+  Alert,
+  StatusBar,
 } from "react-native";
-import React from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useMemo, useState } from "react";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDispatch } from "react-redux";
+import { addToCart } from "../../redux/slices/cartSlice";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -18,146 +27,547 @@ type ProductDetailRouteProp = RouteProp<
 export default function ProductDetailScreen() {
   const route = useRoute<ProductDetailRouteProp>();
   const { product } = route.params;
+  const insets = useSafeAreaInsets();
+  const dispatch = useDispatch();
+
+  const [quantity, setQuantity] = useState<number>(1);
+  const [isFavorite, setIsFavorite] = useState<boolean>(false);
+
+  const formattedPrice = useMemo(() => {
+    const priceNumber = parseInt(product.price);
+    return isNaN(priceNumber)
+      ? product.price
+      : `${priceNumber.toLocaleString()}₫`;
+  }, [product.price]);
+
+  const onToggleFavorite = () => setIsFavorite((prev) => !prev);
+
+  const onShare = async () => {
+    try {
+      await Share.share({
+        message: `${product.name} - ${formattedPrice}\n${product.description}`,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const onIncrease = () => setQuantity((q) => Math.min(q + 1, 99));
+  const onDecrease = () => setQuantity((q) => Math.max(q - 1, 1));
+
+  const onAddToCart = () => {
+    dispatch(
+      addToCart({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        description: product.description,
+        image: product.image,
+        category: product.category,
+        quantity,
+      })
+    );
+    Alert.alert("Đã thêm vào giỏ", `${product.name} x${quantity}`);
+  };
+
+  const onBuyNow = () => {
+    onAddToCart();
+    Alert.alert(
+      "Mua ngay",
+      "Chức năng điều hướng đến thanh toán sẽ được bổ sung."
+    );
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      <Image source={{ uri: product.image }} style={styles.productImage} />
+    <View style={styles.screen}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
-      <View style={styles.content}>
-        <Text style={styles.productName}>{product.name}</Text>
+      {/* Header overlay */}
+      <View style={[styles.headerOverlay, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
 
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>
-            {parseInt(product.price).toLocaleString()}₫
-          </Text>
-          <View style={styles.flashDealBadge}>
-            <Text style={styles.flashDealText}>🔥 Flash Deal</Text>
-          </View>
-        </View>
+        <View style={styles.rightActions}>
+          <TouchableOpacity style={styles.headerIconButton}>
+            <Ionicons name="cart-outline" size={22} color="#fff" />
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>1</Text>
+            </View>
+          </TouchableOpacity>
 
-        <View style={styles.categoryContainer}>
-          <Text style={styles.categoryLabel}>Danh mục:</Text>
-          <Text style={styles.categoryValue}>{product.category}</Text>
-        </View>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={onToggleFavorite}
+          >
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={22}
+              color={isFavorite ? "#FF6B7D" : "#fff"}
+            />
+          </TouchableOpacity>
 
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionLabel}>Mô tả sản phẩm:</Text>
-          <Text style={styles.descriptionText}>{product.description}</Text>
-        </View>
-
-        <View style={styles.productInfo}>
-          <Text style={styles.infoLabel}>Thông tin sản phẩm:</Text>
-          <Text style={styles.infoText}>
-            • Sản phẩm chính hãng, chất lượng cao
-          </Text>
-          <Text style={styles.infoText}>• Giao hàng toàn quốc</Text>
-          <Text style={styles.infoText}>• Hỗ trợ đổi trả trong 30 ngày</Text>
-          <Text style={styles.infoText}>• Bảo hành chính hãng</Text>
+          <TouchableOpacity style={styles.headerIconButton} onPress={onShare}>
+            <Ionicons name="share-social-outline" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
-    </ScrollView>
+
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Image - Full screen */}
+        <View style={styles.heroContainer}>
+          <Image source={{ uri: product.image }} style={styles.heroImage} />
+
+          {/* Beautiful gradient overlay */}
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
+            style={styles.gradientOverlay}
+          />
+        </View>
+
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {/* Product Info */}
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{product.name}</Text>
+            <Text style={styles.productPrice}>{formattedPrice}</Text>
+
+            <View style={styles.ratingRow}>
+              <View style={styles.stars}>
+                {[1, 2, 3, 4].map((star) => (
+                  <Ionicons key={star} name="star" size={14} color="#FFB800" />
+                ))}
+                <Ionicons name="star-half" size={14} color="#FFB800" />
+              </View>
+              <Text style={styles.ratingText}>4.0</Text>
+              <Text style={styles.soldText}>Đã bán 128</Text>
+            </View>
+          </View>
+
+          {/* Delivery Info */}
+          <View style={styles.deliverySection}>
+            <View style={styles.deliveryRow}>
+              <Ionicons name="location-outline" size={16} color="#666" />
+              <Text style={styles.deliveryLabel}>Địa điểm chi nhánh:</Text>
+              <Text style={styles.deliveryValue}>
+                82 Hồ Tùng Mậu, P.Bến Nghé, Q.1, TP.HCM
+              </Text>
+            </View>
+
+            <View style={styles.deliveryRow}>
+              <Ionicons name="time-outline" size={16} color="#666" />
+              <Text style={styles.deliveryLabel}>Thời gian giao:</Text>
+              <Text style={styles.deliveryValue}>24h - 48h</Text>
+            </View>
+          </View>
+
+          {/* Product Description */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>Mô tả sản phẩm</Text>
+            <Text style={styles.descriptionText}>{product.description}</Text>
+          </View>
+
+          {/* Specifications */}
+          <View style={styles.specsSection}>
+            <Text style={styles.sectionTitle}>Thông tin chi tiết</Text>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>Thương hiệu</Text>
+              <Text style={styles.specValue}>Innisfree</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>Xuất xứ</Text>
+              <Text style={styles.specValue}>Hàn Quốc</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>Dung tích</Text>
+              <Text style={styles.specValue}>50ml</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>Bảo hành</Text>
+              <Text style={styles.specValue}>12 tháng</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Floating Cart Button */}
+      <TouchableOpacity style={styles.floatingCart}>
+        <Ionicons name="cart" size={20} color="#fff" />
+        <View style={styles.floatingCartBadge}>
+          <Text style={styles.floatingCartText}>1</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Bottom Action Bar */}
+      <View
+        style={[
+          styles.bottomActionBar,
+          { paddingBottom: Math.max(insets.bottom, 12) },
+        ]}
+      >
+        <TouchableOpacity style={styles.chatButton}>
+          <Ionicons name="chatbubble-outline" size={20} color="#666" />
+          <Text style={styles.chatButtonText}>Chat</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.addToCartButton} onPress={onAddToCart}>
+          <Ionicons name="cart-outline" size={18} color="#fff" />
+          <Text style={styles.actionButtonText}>Thêm vào giỏ</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.buyNowButton} onPress={onBuyNow}>
+          <Ionicons name="flash-outline" size={18} color="#fff" />
+          <Text style={styles.actionButtonText}>Mua ngay</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
-  productImage: {
+
+  // Header Styles
+  headerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  cartBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#FF6B7D",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+
+  // Hero Section
+  heroContainer: {
     width: width,
-    height: width * 0.8,
-    resizeMode: "contain",
-    backgroundColor: "#fff",
+    height: height * 0.6,
+    position: "relative",
   },
-  content: {
-    padding: 20,
+  heroImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
-  productName: {
+  gradientOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+  },
+  titleOverlay: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+  },
+  heroTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 15,
-    lineHeight: 32,
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
-  priceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  price: {
+  heroSubtitle: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#e74c3c",
-    marginRight: 15,
-  },
-  flashDealBadge: {
-    backgroundColor: "#ff6b6b",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  flashDealText: {
     color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
+    marginTop: -4,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
-  categoryContainer: {
+  heroDescription: {
+    fontSize: 14,
+    color: "#fff",
+    marginTop: 4,
+    opacity: 0.9,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  // Content Card
+  contentCard: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -30,
+    paddingTop: 24,
+    flex: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+
+  // Product Info
+  productInfo: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+  productName: {
+    fontSize: 19,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+    marginBottom: 10,
+    lineHeight: 26,
+  },
+  productPrice: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FF6B7D",
+    marginBottom: 14,
+  },
+  ratingRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    gap: 8,
   },
-  categoryLabel: {
-    fontSize: 16,
-    fontWeight: "600",
+  stars: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  ratingText: {
+    fontSize: 14,
     color: "#666",
-    marginRight: 10,
-  },
-  categoryValue: {
-    fontSize: 16,
-    color: "#333",
     fontWeight: "500",
   },
-  descriptionContainer: {
-    marginBottom: 20,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-  },
-  descriptionLabel: {
-    fontSize: 16,
-    fontWeight: "600",
+  soldText: {
+    fontSize: 14,
     color: "#666",
-    marginBottom: 10,
+    marginLeft: "auto",
+  },
+
+  // Delivery Section
+  deliverySection: {
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+    backgroundColor: "#fafafa",
+  },
+  deliveryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  deliveryLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 8,
+    width: 120,
+  },
+  deliveryValue: {
+    fontSize: 14,
+    color: "#333",
+    flex: 1,
+    fontWeight: "500",
+  },
+
+  // Sections
+  descriptionSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  specsSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 12,
   },
   descriptionText: {
-    fontSize: 15,
-    color: "#333",
-    lineHeight: 22,
-  },
-  productInfo: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-  },
-  infoLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 15,
-  },
-  infoText: {
     fontSize: 14,
-    color: "#555",
-    marginBottom: 8,
+    color: "#666",
     lineHeight: 20,
+  },
+  specRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f8f8f8",
+  },
+  specLabel: {
+    fontSize: 14,
+    color: "#666",
+    width: 120,
+  },
+  specValue: {
+    fontSize: 14,
+    color: "#333",
+    flex: 1,
+    fontWeight: "500",
+  },
+
+  // Floating Cart
+  floatingCart: {
+    position: "absolute",
+    right: 16,
+    bottom: 100,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#FF6B7D",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  floatingCartBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#FF4757",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  floatingCartText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+
+  // Bottom Action Bar
+  bottomActionBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  chatButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chatButtonText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  addToCartButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFA726",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 6,
+    shadowColor: "#FFA726",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  buyNowButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF6B7D",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 6,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  actionButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
   },
 });

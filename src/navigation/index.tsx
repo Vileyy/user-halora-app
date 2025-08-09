@@ -32,9 +32,7 @@ export default function AppNavigator() {
           name="ProductDetailScreen"
           component={ProductDetailScreen}
           options={{
-            headerShown: true,
-            title: "Chi tiết sản phẩm",
-            headerBackTitle: "Quay lại",
+            headerShown: false,
           }}
         />
       </Stack.Navigator>
