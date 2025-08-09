@@ -9,6 +9,7 @@ import {
   StatusBar,
   Animated,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch } from "react-redux";
@@ -43,6 +44,7 @@ export default function LoginScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Animated values
   const emailLabelAnim = useRef(new Animated.Value(0)).current;
@@ -88,14 +90,29 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email.includes("@")) {
-      dispatch(setError("Email không hợp lệ"));
+      Toast.show({
+        type: "error",
+        text1: "Lỗi!",
+        text2: "Email không hợp lệ",
+        position: "top",
+        visibilityTime: 3000,
+      });
       return;
     }
     if (password.length < 6) {
-      dispatch(setError("Mật khẩu phải từ 6 ký tự trở lên"));
+      Toast.show({
+        type: "error",
+        text1: "Lỗi!",
+        text2: "Mật khẩu phải từ 6 ký tự trở lên",
+        position: "top",
+        visibilityTime: 3000,
+      });
       return;
     }
+
+    setIsLoading(true);
     dispatch(setError(null));
+
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -120,17 +137,24 @@ export default function LoginScreen() {
         console.log("Lỗi khi lấy thông tin user từ database:", dbError);
       }
 
-      // Hiển thị thông báo thành công
-      Toast.show({
-        type: "success",
-        text1: "Đăng nhập thành công!",
-        text2: "Chào mừng bạn trở lại",
-        position: "top",
-        visibilityTime: 3000,
-      });
-      // navigation.navigate("HomeScreen");
+      // Delay 1 giây để hiển thị loading
+      setTimeout(() => {
+        setIsLoading(false);
+
+        // Hiển thị thông báo thành công
+        Toast.show({
+          type: "success",
+          text1: "Đăng nhập thành công!",
+          text2: "Chào mừng bạn trở lại",
+          position: "top",
+          visibilityTime: 3000,
+        });
+
+        navigation.navigate("MainTabs");
+      }, 1000);
     } catch (error: any) {
       console.log("Đăng nhập thất bại", error);
+      setIsLoading(false);
 
       // Hiển thị thông báo lỗi
       Toast.show({
@@ -308,12 +332,20 @@ export default function LoginScreen() {
           </View>
 
           {/* Login Button */}
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              isLoading && styles.loginButtonDisabled,
+            ]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            )}
           </TouchableOpacity>
-
-          {/* Error Message */}
-          {error && <Text style={styles.errorText}>{error}</Text>}
 
           {/* Register Link */}
           <View style={styles.registerContainer}>
@@ -508,10 +540,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-  errorText: {
-    color: "#FF0000",
-    textAlign: "center",
-    marginBottom: 15,
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   registerContainer: {
     flexDirection: "row",

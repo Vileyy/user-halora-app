@@ -1,9 +1,11 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
+import { RootStackParamList } from "../types/navigation";
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
-import { RootStackParamList } from "../types/navigation";
+import MainTabs from "./tabs/MainTabs";
+import ProductDetailScreen from "../screens/product/ProductDetailScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -20,6 +22,20 @@ export default function AppNavigator() {
           name="RegisterScreen"
           component={RegisterScreen}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MainTabs"
+          component={MainTabs}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ProductDetailScreen"
+          component={ProductDetailScreen}
+          options={{
+            headerShown: true,
+            title: "Chi tiết sản phẩm",
+            headerBackTitle: "Quay lại",
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

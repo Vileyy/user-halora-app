@@ -1,9 +1,14 @@
-// src/redux/reducers/index.ts
 import { combineReducers } from "@reduxjs/toolkit";
 import authReducer from "../slices/authSlice";
+import notifyReducer from "../slices/notifySlice";
+import cartReducer from "../slices/cartSlice";
+import favoritesReducer from "../slices/favoritesSlice";
 
-export const rootReducer = combineReducers({
+const rootReducer = combineReducers({
   auth: authReducer,
+  notify: notifyReducer,
+  cart: cartReducer,
+  favorites: favoritesReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
