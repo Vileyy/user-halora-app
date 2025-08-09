@@ -9,8 +9,10 @@ import {
   Share,
   Alert,
   StatusBar,
+  Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation";
@@ -32,6 +34,8 @@ export default function ProductDetailScreen() {
 
   const [quantity, setQuantity] = useState<number>(1);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
+  const [showQuantityModal, setShowQuantityModal] = useState<boolean>(false);
+  const [tempQuantity, setTempQuantity] = useState<number>(1);
 
   const formattedPrice = useMemo(() => {
     const priceNumber = parseInt(product.price);
@@ -55,7 +59,47 @@ export default function ProductDetailScreen() {
   const onIncrease = () => setQuantity((q) => Math.min(q + 1, 99));
   const onDecrease = () => setQuantity((q) => Math.max(q - 1, 1));
 
+  const onTempIncrease = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTempQuantity((q) => Math.min(q + 1, 99));
+  };
+
+  const onTempDecrease = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTempQuantity((q) => Math.max(q - 1, 1));
+  };
+
+  const openQuantityModal = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTempQuantity(quantity);
+    setShowQuantityModal(true);
+  };
+
+  const confirmAddToCart = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setQuantity(tempQuantity);
+    dispatch(
+      addToCart({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        description: product.description,
+        image: product.image,
+        category: product.category,
+        quantity: tempQuantity,
+      })
+    );
+    setShowQuantityModal(false);
+    Alert.alert("Đã thêm vào giỏ", `${product.name} x${tempQuantity}`);
+  };
+
   const onAddToCart = () => {
+    openQuantityModal();
+  };
+
+  const onBuyNow = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // Add to cart first with current quantity
     dispatch(
       addToCart({
         id: product.id,
@@ -67,15 +111,15 @@ export default function ProductDetailScreen() {
         quantity,
       })
     );
-    Alert.alert("Đã thêm vào giỏ", `${product.name} x${quantity}`);
-  };
-
-  const onBuyNow = () => {
-    onAddToCart();
-    Alert.alert(
-      "Mua ngay",
-      "Chức năng điều hướng đến thanh toán sẽ được bổ sung."
-    );
+    Alert.alert("Mua ngay", "Đang chuyển đến trang thanh toán...", [
+      {
+        text: "OK",
+        onPress: () => {
+          // TODO: Navigate to checkout screen
+          console.log("Navigate to checkout");
+        },
+      },
+    ]);
   };
 
   return (
@@ -228,6 +272,103 @@ export default function ProductDetailScreen() {
           <Text style={styles.actionButtonText}>Mua ngay</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Quantity Selection Modal */}
+      <Modal
+        visible={showQuantityModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowQuantityModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn số lượng</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowQuantityModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Product Info in Modal */}
+            <View style={styles.modalProductInfo}>
+              <Image
+                source={{ uri: product.image }}
+                style={styles.modalProductImage}
+              />
+              <View style={styles.modalProductDetails}>
+                <Text style={styles.modalProductName} numberOfLines={2}>
+                  {product.name}
+                </Text>
+                <Text style={styles.modalProductPrice}>{formattedPrice}</Text>
+              </View>
+            </View>
+
+            {/* Quantity Selector */}
+            <View style={styles.quantitySection}>
+              <Text style={styles.quantityLabel}>Số lượng:</Text>
+              <View style={styles.quantityControls}>
+                <TouchableOpacity
+                  style={[
+                    styles.quantityButton,
+                    tempQuantity <= 1 && styles.quantityButtonDisabled,
+                  ]}
+                  onPress={onTempDecrease}
+                  disabled={tempQuantity <= 1}
+                >
+                  <Ionicons
+                    name="remove"
+                    size={20}
+                    color={tempQuantity <= 1 ? "#ccc" : "#333"}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.quantityDisplay}>
+                  <Text style={styles.quantityText}>{tempQuantity}</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.quantityButton,
+                    tempQuantity >= 99 && styles.quantityButtonDisabled,
+                  ]}
+                  onPress={onTempIncrease}
+                  disabled={tempQuantity >= 99}
+                >
+                  <Ionicons
+                    name="add"
+                    size={20}
+                    color={tempQuantity >= 99 ? "#ccc" : "#333"}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Modal Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowQuantityModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Hủy</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={confirmAddToCart}
+              >
+                <Ionicons name="cart" size={18} color="#fff" />
+                <Text style={styles.confirmButtonText}>
+                  Thêm {tempQuantity} vào giỏ
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -569,5 +710,153 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 14,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 20,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f5f5f5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalProductInfo: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalProductImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: "#f5f5f5",
+  },
+  modalProductDetails: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: "center",
+  },
+  modalProductName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  modalProductPrice: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FF6B7D",
+  },
+  quantitySection: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  quantityLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 16,
+  },
+  quantityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  quantityButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#f5f5f5",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  quantityButtonDisabled: {
+    backgroundColor: "#f9f9f9",
+    borderColor: "#f0f0f0",
+  },
+  quantityDisplay: {
+    minWidth: 60,
+    height: 44,
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#FF6B7D",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quantityText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  modalActions: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#f5f5f5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+  },
+  confirmButton: {
+    flex: 2,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#FF6B7D",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
   },
 });
