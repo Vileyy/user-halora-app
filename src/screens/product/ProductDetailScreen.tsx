@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
-import { RouteProp, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,7 +31,7 @@ export default function ProductDetailScreen() {
   const { product } = route.params;
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
-
+  const navigation = useNavigation();
   const [quantity, setQuantity] = useState<number>(1);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [showQuantityModal, setShowQuantityModal] = useState<boolean>(false);
@@ -99,7 +99,6 @@ export default function ProductDetailScreen() {
 
   const onBuyNow = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    // Add to cart first with current quantity
     dispatch(
       addToCart({
         id: product.id,
@@ -132,7 +131,7 @@ export default function ProductDetailScreen() {
 
       {/* Header overlay */}
       <View style={[styles.headerOverlay, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.backButton}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
 
@@ -169,12 +168,6 @@ export default function ProductDetailScreen() {
         {/* Hero Image - Full screen */}
         <View style={styles.heroContainer}>
           <Image source={{ uri: product.image }} style={styles.heroImage} />
-
-          {/* Beautiful gradient overlay */}
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
-            style={styles.gradientOverlay}
-          />
         </View>
 
         {/* Content Card */}

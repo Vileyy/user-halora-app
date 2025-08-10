@@ -118,6 +118,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F08080",
     paddingHorizontal: 10,
     paddingBottom: 10,
+    marginTop: -40,
   },
   searchContainer: {
     flex: 1,

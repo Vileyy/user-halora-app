@@ -120,16 +120,13 @@ export default function LoginScreen() {
         password
       );
       console.log("Đăng nhập thành công", userCredential.user);
-
-      // Lấy thông tin user từ database
       try {
         const userRef = ref(database, `users/${userCredential.user.uid}`);
         const snapshot = await get(userRef);
 
         if (snapshot.exists()) {
           const userData = snapshot.val();
-          console.log("Thông tin user từ database:", userData);
-
+          // console.log("Thông tin user từ database:", userData);
           // Lưu thông tin user vào Redux state
           dispatch(setUser(userData));
         }
@@ -140,8 +137,6 @@ export default function LoginScreen() {
       // Delay 1 giây để hiển thị loading
       setTimeout(() => {
         setIsLoading(false);
-
-        // Hiển thị thông báo thành công
         Toast.show({
           type: "success",
           text1: "Đăng nhập thành công!",
