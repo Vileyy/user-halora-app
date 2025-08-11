@@ -20,7 +20,7 @@ interface CategoryItem {
 
 const Categories: React.FC = () => {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
+  const navigation = useNavigation();
 
   useEffect(() => {
     const db = getDatabase();
@@ -44,8 +44,11 @@ const Categories: React.FC = () => {
   // ✅ Xử lý khi bấm vào danh mục
   const handleCategoryPress = (categoryTitle: string) => {
     console.log("Category pressed:", categoryTitle);
-    navigation.navigate("SearchScreen");
-  };
+    (navigation as any).navigate("ViewAllScreen", {
+      category: categoryTitle,
+      title: categoryTitle, 
+    });
+  };  
 
   const renderItem = ({ item }: { item: CategoryItem }) => (
     <TouchableOpacity
@@ -67,10 +70,10 @@ const Categories: React.FC = () => {
         <TouchableOpacity
           onPress={() => {
             console.log("View all categories pressed");
-            // navigation.navigate("ViewAllScreen", {
-            //   category: "categories",
-            //   title: "Tất cả danh mục",
-            // });
+            (navigation as any).navigate("ViewAllScreen", {
+              category: "categories",
+              title: "Tất cả danh mục",
+            });
           }}
         >
           <Text style={styles.viewAll}>Xem tất cả</Text>

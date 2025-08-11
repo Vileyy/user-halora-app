@@ -13,6 +13,10 @@ export type RootStackParamList = {
       category: string;
     };
   };
+  ViewAllScreen: {
+    category: string;
+    title: string;
+  };
 };
 
 export type TabParamList = {

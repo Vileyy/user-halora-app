@@ -76,10 +76,10 @@ const NewProducts: React.FC = () => {
         <TouchableOpacity
           onPress={() => {
             console.log("View all new products pressed");
-            // navigation.navigate("ViewAllScreen", {
-            //   category: "new_product",
-            //   title: "Sản phẩm mới",
-            // });
+            (navigation as any).navigate("ViewAllScreen", {
+              category: "new_product",
+              title: "Sản phẩm mới",
+            });
           }}
         >
           <Text style={styles.viewAll}>Xem tất cả</Text>

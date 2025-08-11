@@ -150,11 +150,11 @@ const FlashDeals: React.FC = () => {
         </View>
         <TouchableOpacity
           onPress={() => {
-            console.log("View all pressed");
-            // navigation.navigate("ViewAllScreen", {
-            //   category: "FlashDeals",
-            //   title: "Flash Deals",
-            // });
+            // console.log("View all pressed");
+            (navigation as any).navigate("ViewAllScreen", {
+              category: "FlashDeals",
+              title: "Flash Deals",
+            });
           }}
         >
           <Text style={styles.viewAll}>Xem tất cả</Text>

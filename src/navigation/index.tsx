@@ -6,6 +6,7 @@ import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
 import MainTabs from "./tabs/MainTabs";
 import ProductDetailScreen from "../screens/product/ProductDetailScreen";
+import ViewAllScreen from "../screens/viewall/ViewAllScreen ";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -34,6 +35,11 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="ViewAllScreen"
+          component={ViewAllScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
