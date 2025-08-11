@@ -7,6 +7,8 @@ import RegisterScreen from "../screens/auth/RegisterScreen";
 import MainTabs from "./tabs/MainTabs";
 import ProductDetailScreen from "../screens/product/ProductDetailScreen";
 import ViewAllScreen from "../screens/viewall/ViewAllScreen ";
+import CartScreen from "../screens/cart/CartScreen";
+import CheckoutScreen from "../screens/checkout/CheckoutScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -39,6 +41,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ViewAllScreen"
           component={ViewAllScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CartScreen"
+          component={CartScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CheckoutScreen"
+          component={CheckoutScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

@@ -17,11 +17,27 @@ export type RootStackParamList = {
     category: string;
     title: string;
   };
+  CartScreen: undefined;
+  CheckoutScreen: {
+    selectedItems: Array<{
+      id: string;
+      name: string;
+      price: string;
+      description: string;
+      image: string;
+      category: string;
+      quantity: number;
+      selectedSize?: string;
+      selectedColor?: string;
+    }>;
+    totalPrice: number;
+  };
 };
 
 export type TabParamList = {
   HomeScreen: undefined;
   SearchScreen: undefined;
+  CartScreen: undefined;
   NotifyScreen: undefined;
   ProfileScreen: undefined;
 };

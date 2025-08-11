@@ -4,6 +4,7 @@ import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { TabParamList } from "../../types/navigation";
 import HomeScreen from "../../screens/home/HomeScreen";
 import SearchScreen from "../../screens/search/SearchScreen";
+import CartScreen from "../../screens/cart/CartScreen";
 import NotifyScreen from "../../screens/notify/NotifyScreen";
 import ProfileScreen from "../../screens/profile/ProfileScreen";
 
@@ -15,6 +16,8 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 export default function MainTabs() {
   const notifyCount = useSelector((s: RootState) => s.notify?.unreadCount ?? 0);
+  const cartItems = useSelector((s: RootState) => s.cart.items);
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <Tab.Navigator
@@ -45,6 +48,14 @@ export default function MainTabs() {
               return (
                 <Ionicons
                   name={focused ? "search" : "search-outline"}
+                  size={size}
+                  color={color}
+                />
+              );
+            case "CartScreen":
+              return (
+                <Ionicons
+                  name={focused ? "basket" : "basket-outline"}
                   size={size}
                   color={color}
                 />
@@ -82,6 +93,15 @@ export default function MainTabs() {
         name="SearchScreen"
         component={SearchScreen}
         options={{ title: "Tìm kiếm" }}
+      />
+      <Tab.Screen
+        name="CartScreen"
+        component={CartScreen}
+        options={{
+          title: "Giỏ hàng",
+          tabBarBadge: cartCount > 0 ? cartCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: "#FF6B7D" },
+        }}
       />
       <Tab.Screen
         name="NotifyScreen"

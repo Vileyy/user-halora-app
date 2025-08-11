@@ -18,8 +18,9 @@ import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useDispatch } from "react-redux";
-import { addToCart } from "../../redux/slices/cartSlice";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/reducers/rootReducer";
+import { useCartSync } from "../../hooks/useCartSync";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -30,17 +31,24 @@ export default function ProductDetailScreen() {
   const route = useRoute<ProductDetailRouteProp>();
   const { product } = route.params;
   const insets = useSafeAreaInsets();
-  const dispatch = useDispatch();
   const navigation = useNavigation();
+  const cartItems = useSelector((state: RootState) => state.cart.items);
+  const { addItemToCart } = useCartSync();
+
+  const totalCartItems = cartItems.reduce(
+    (sum, item) => sum + item.quantity,
+    0
+  );
   const [quantity, setQuantity] = useState<number>(1);
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [showQuantityModal, setShowQuantityModal] = useState<boolean>(false);
   const [tempQuantity, setTempQuantity] = useState<number>(1);
 
   const formattedPrice = useMemo(() => {
-    const priceNumber = parseInt(product.price);
-    return isNaN(priceNumber)
-      ? product.price
+    const priceStr = product.price || "0";
+    const priceNumber = parseInt(priceStr.toString().replace(/[^\d]/g, ""));
+    return isNaN(priceNumber) || priceNumber === 0
+      ? "0₫"
       : `${priceNumber.toLocaleString()}₫`;
   }, [product.price]);
 
@@ -78,17 +86,14 @@ export default function ProductDetailScreen() {
   const confirmAddToCart = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setQuantity(tempQuantity);
-    dispatch(
-      addToCart({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        description: product.description,
-        image: product.image,
-        category: product.category,
-        quantity: tempQuantity,
-      })
-    );
+    addItemToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      description: product.description,
+      image: product.image,
+      category: product.category,
+    });
     setShowQuantityModal(false);
     Alert.alert("Đã thêm vào giỏ", `${product.name} x${tempQuantity}`);
   };
@@ -99,17 +104,14 @@ export default function ProductDetailScreen() {
 
   const onBuyNow = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    dispatch(
-      addToCart({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        description: product.description,
-        image: product.image,
-        category: product.category,
-        quantity,
-      })
-    );
+    addItemToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      description: product.description,
+      image: product.image,
+      category: product.category,
+    });
     Alert.alert("Mua ngay", "Đang chuyển đến trang thanh toán...", [
       {
         text: "OK",
@@ -131,16 +133,24 @@ export default function ProductDetailScreen() {
 
       {/* Header overlay */}
       <View style={[styles.headerOverlay, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
 
         <View style={styles.rightActions}>
-          <TouchableOpacity style={styles.headerIconButton}>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => navigation.navigate("CartScreen" as never)}
+          >
             <Ionicons name="cart-outline" size={22} color="#fff" />
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>1</Text>
-            </View>
+            {totalCartItems > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{totalCartItems}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -236,12 +246,17 @@ export default function ProductDetailScreen() {
       </ScrollView>
 
       {/* Floating Cart Button */}
-      <TouchableOpacity style={styles.floatingCart}>
-        <Ionicons name="cart" size={20} color="#fff" />
-        <View style={styles.floatingCartBadge}>
-          <Text style={styles.floatingCartText}>1</Text>
-        </View>
-      </TouchableOpacity>
+      {totalCartItems > 0 && (
+        <TouchableOpacity
+          style={styles.floatingCart}
+          onPress={() => navigation.navigate("CartScreen" as never)}
+        >
+          <Ionicons name="cart" size={20} color="#fff" />
+          <View style={styles.floatingCartBadge}>
+            <Text style={styles.floatingCartText}>{totalCartItems}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Bottom Action Bar */}
       <View

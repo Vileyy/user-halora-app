@@ -10,6 +10,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { TabParamList } from "../types/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "../redux/reducers/rootReducer";
+import CartBadge from "./CartBadge";
 
 interface HeaderProps {
   search?: string;
@@ -25,19 +28,22 @@ const Header: React.FC<HeaderProps> = ({
   const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [cartItems, setCartItems] = useState(0); 
+
+  // Lấy số lượng sản phẩm trong giỏ hàng từ Redux
+  const cartItems = useSelector((state: RootState) =>
+    state.cart.items.reduce((total, item) => total + item.quantity, 0)
+  );
 
   useEffect(() => {
     // Mock fetch notifications
     const fetchNotifications = () => {
-      // Simulate unread notifications
       setUnreadCount(3);
     };
 
     fetchNotifications();
   }, []);
 
-  // Mock total items in cart
+  // Tổng số sản phẩm trong giỏ hàng
   const totalItems = cartItems;
 
   const handleMenuPress = () => {
@@ -58,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const handleCartPress = () => {
-    console.log("Cart pressed");
+    navigation.navigate("CartScreen");
   };
 
   return (
@@ -99,14 +105,10 @@ const Header: React.FC<HeaderProps> = ({
       </TouchableOpacity>
 
       {/* Giỏ hàng */}
-      <TouchableOpacity style={styles.iconButton} onPress={handleCartPress}>
+      {/* <TouchableOpacity style={styles.iconButton} onPress={handleCartPress}>
         <Ionicons name="cart-outline" size={24} color="black" />
-        {totalItems > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{totalItems}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+        <CartBadge size="medium" />
+      </TouchableOpacity> */}
     </View>
   );
 };
