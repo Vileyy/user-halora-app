@@ -112,13 +112,13 @@ export default function ViewAllScreen() {
     }
   }, [loading]);
 
-    // Products loaded animation with staggered fade in down
+  // Products loaded animation with staggered fade in down
   useEffect(() => {
     if (!loading && products.length > 0) {
       // Create animation values for each product
       const animations = products.map(() => new Animated.Value(0));
       setItemAnimations(animations);
-      
+
       // Start staggered animations
       Animated.sequence([
         Animated.delay(100),
@@ -319,9 +319,9 @@ export default function ViewAllScreen() {
     }
   };
 
-    const renderProduct = ({ item, index }: { item: Product; index: number }) => {
+  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
     const itemAnim = itemAnimations[index] || new Animated.Value(0);
-    
+
     return (
       <Animated.View
         style={[
@@ -572,7 +572,7 @@ export default function ViewAllScreen() {
       {renderSortOptions()}
 
       {/* Products Count */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.countContainer,
           {
@@ -596,7 +596,7 @@ export default function ViewAllScreen() {
 
       {/* Products List */}
       {filteredProducts.length === 0 ? (
-        <Animated.View 
+        <Animated.View
           style={[
             styles.emptyContainer,
             {
