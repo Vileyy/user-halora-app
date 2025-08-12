@@ -15,16 +15,33 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../types/navigation";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "../../redux/reducers/rootReducer";
+import { clearCart } from "../../redux/slices/cartSlice";
+import {
+  createOrder,
+  clearUserCart,
+  getUserOrdersDebug,
+} from "../../services/orderService";
 
 type CheckoutScreenRouteProp = RouteProp<RootStackParamList, "CheckoutScreen">;
+type CheckoutScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  "CheckoutScreen"
+>;
 
 type CartItem = {
   id: string;
   name: string;
   image: string;
   quantity: number;
-  price: string | number; // "120.000₫" hoặc 120000
+  price: string | number;
+  description?: string;
+  category?: string;
+  selectedSize?: string;
+  selectedColor?: string;
 };
 
 const MONEY = (n: number) => `${(n || 0).toLocaleString()}₫`;
@@ -32,8 +49,11 @@ const parseMoney = (v: string | number) =>
   typeof v === "number" ? v : parseInt(String(v).replace(/[^\d]/g, "")) || 0;
 
 export default function CheckoutScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<CheckoutScreenNavigationProp>();
   const route = useRoute<CheckoutScreenRouteProp>();
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const { selectedItems, totalPrice } = route.params as {
     selectedItems: CartItem[];
     totalPrice: number;
@@ -97,6 +117,11 @@ export default function CheckoutScreen() {
   };
 
   const handlePlaceOrder = () => {
+    if (!user) {
+      Alert.alert("Lỗi", "Vui lòng đăng nhập để đặt hàng");
+      return;
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(
       "Xác nhận đặt hàng",
@@ -107,20 +132,82 @@ export default function CheckoutScreen() {
         { text: "Hủy", style: "cancel" },
         {
           text: "Đặt hàng",
-          onPress: () => {
-            // TODO: Ghi đơn lên Firebase
-            console.log("Order placed:", {
-              items: selectedItems,
-              itemsSubtotal,
-              discountAmount,
-              shipping: effectiveShipping,
-              total: finalTotal,
-              shippingMethod,
-              paymentMethod,
-              coupon: appliedCoupon,
-            });
-            Alert.alert("Thành công", "Đặt hàng thành công!");
-            navigation.goBack();
+          onPress: async () => {
+            setIsPlacingOrder(true);
+            try {
+              // Tạo order data
+              const orderData = {
+                items: selectedItems.map((item) => {
+                  const orderItem: any = {
+                    id: item.id,
+                    name: item.name,
+                    price: item.price.toString(),
+                    description: item.description || "",
+                    image: item.image,
+                    category: item.category || "Other",
+                    quantity: item.quantity,
+                  };
+
+                  // Chỉ thêm selectedSize và selectedColor nếu chúng không undefined
+                  if (item.selectedSize !== undefined) {
+                    orderItem.selectedSize = item.selectedSize;
+                  }
+                  if (item.selectedColor !== undefined) {
+                    orderItem.selectedColor = item.selectedColor;
+                  }
+
+                  return orderItem;
+                }),
+                itemsSubtotal,
+                discountAmount,
+                shippingCost: effectiveShipping,
+                totalAmount: finalTotal,
+                shippingMethod,
+                paymentMethod,
+                appliedCoupon: appliedCoupon || null,
+              };
+
+              console.log(
+                "Creating order with data:",
+                JSON.stringify(orderData, null, 2)
+              );
+
+              // Lưu order vào Firebase với cấu trúc: users/{userId}/orders/{orderId}
+              const orderId = await createOrder(user.uid, orderData);
+              console.log("Order created successfully with ID:", orderId);
+
+              // Debug: Kiểm tra tất cả orders của user trong Firebase
+              await getUserOrdersDebug(user.uid);
+
+              // CHỈ XÓA CART SAU KHI ORDER ĐÃ ĐƯỢC TẠO THÀNH CÔNG
+
+              // Xóa cart từ Redux
+              dispatch(clearCart());
+              console.log("Cart cleared from Redux");
+
+              // Xóa cart từ Firebase
+              await clearUserCart(user.uid);
+              console.log("Cart cleared from Firebase");
+
+              // Navigate đến OrderSuccessScreen
+              (navigation as any).navigate("OrderSuccessScreen", {
+                orderId,
+                totalAmount: finalTotal,
+              });
+              console.log("Navigated to OrderSuccessScreen");
+            } catch (error) {
+              console.error("Error placing order:", error);
+
+              // Hiển thị lỗi chi tiết hơn
+              let errorMessage = "Không thể đặt hàng. Vui lòng thử lại.";
+              if (error instanceof Error) {
+                errorMessage = error.message;
+              }
+
+              Alert.alert("Lỗi đặt hàng", errorMessage);
+            } finally {
+              setIsPlacingOrder(false);
+            }
           },
         },
       ]
@@ -377,16 +464,22 @@ export default function CheckoutScreen() {
           <Text style={styles.totalAmount}>{MONEY(finalTotal)}</Text>
         </View>
         <TouchableOpacity
-          style={styles.placeOrderButton}
+          style={[
+            styles.placeOrderButton,
+            isPlacingOrder && styles.placeOrderButtonDisabled,
+          ]}
           onPress={handlePlaceOrder}
+          disabled={isPlacingOrder}
         >
           <LinearGradient
-            colors={["#FF6B7D", "#FF8A9B"]}
+            colors={isPlacingOrder ? ["#ccc", "#ddd"] : ["#FF6B7D", "#FF8A9B"]}
             style={styles.placeOrderGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Text style={styles.placeOrderText}>Đặt hàng</Text>
+            <Text style={styles.placeOrderText}>
+              {isPlacingOrder ? "Đang xử lý..." : "Đặt hàng"}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -414,15 +507,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  backButton: { padding: 4 },
+  backButton: {
+    padding: 4,
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#1a1a1a",
   },
-  placeholder: { width: 32 },
+  placeholder: {
+    width: 32,
+  },
 
-  scrollView: { flex: 1 },
+  scrollView: {
+    flex: 1,
+  },
 
   section: {
     backgroundColor: "#fff",
@@ -507,7 +606,7 @@ const styles = StyleSheet.create({
   couponInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 14,
+    fontSize: 10,
     color: "#1a1a1a",
   },
   applyButton: {
@@ -720,5 +819,8 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  placeOrderButtonDisabled: {
+    opacity: 0.6,
   },
 });

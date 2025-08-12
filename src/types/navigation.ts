@@ -32,6 +32,9 @@ export type RootStackParamList = {
     }>;
     totalPrice: number;
   };
+  OrderSuccessScreen: undefined;
+  OrderDetailScreen: { orderId: string };
+  OrderTrackingScreen: { orderId: string };
 };
 
 export type TabParamList = {
