@@ -14,6 +14,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { getAuth, signOut } from "firebase/auth";
 import { getDatabase, ref, onValue, off } from "firebase/database";
+import { useAuth } from "../../hooks/useAuth";
+import AuthRequiredModal from "../../components/AuthRequiredModal";
 
 interface User {
   uid: string;
@@ -33,7 +35,9 @@ interface ProfileScreenProps {
 const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const auth = getAuth();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     fetchUserData();
@@ -58,16 +62,18 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
 
       return unsubscribe; // Return cleanup function
     } else {
-      // Nếu không có user đăng nhập, chuyển về login
+      // Nếu không có user đăng nhập, không redirect nữa
       setLoading(false);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "LoginScreen" }],
-      });
     }
   };
 
   const handleMenuPress = (menuItem: string) => {
+    // Kiểm tra đăng nhập trước khi thực hiện action
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+
     switch (menuItem) {
       case "profile":
         // Navigate to profile edit screen
@@ -192,6 +198,48 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
     );
   }
 
+  // Render UI yêu cầu đăng nhập
+  const renderNotLoggedIn = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="person-circle-outline" size={120} color="#E0E0E0" />
+      <Text style={styles.emptyTitle}>Cần đăng nhập</Text>
+      <Text style={styles.emptySubtitle}>
+        Vui lòng đăng nhập để xem thông tin cá nhân và sử dụng các tính năng
+        khác
+      </Text>
+      <TouchableOpacity
+        style={styles.loginButton}
+        onPress={() => setShowAuthModal(true)}
+      >
+        <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Nếu chưa đăng nhập
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+        {/* Header */}
+        <View style={styles.profileHeader}>
+          <Text style={styles.profileHeaderTitle}>Cá nhân</Text>
+        </View>
+
+        {/* Content */}
+        {renderNotLoggedIn()}
+
+        <AuthRequiredModal
+          visible={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          title="Đăng nhập cần thiết"
+          message="Vui lòng đăng nhập để truy cập thông tin cá nhân"
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -274,6 +322,13 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
           </View>
         )} */}
       </ScrollView>
+
+      <AuthRequiredModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Đăng nhập cần thiết"
+        message="Vui lòng đăng nhập để sử dụng tính năng này"
+      />
     </View>
   );
 };
@@ -414,6 +469,60 @@ const styles = StyleSheet.create({
   },
   bannedText: {
     color: "#e74c3c",
+  },
+  profileHeader: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  profileHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  loginButton: {
+    backgroundColor: "#FF6B7D",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    elevation: 4,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
 

@@ -15,7 +15,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="LoginScreen">
+      <Stack.Navigator initialRouteName="MainTabs">
         <Stack.Screen
           name="LoginScreen"
           component={LoginScreen}

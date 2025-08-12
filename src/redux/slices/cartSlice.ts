@@ -47,7 +47,7 @@ const cartSlice = createSlice({
         image: action.payload.image || "",
         category: action.payload.category || "Other",
         description: action.payload.description || "",
-        selected: true, // Mặc định sản phẩm mới được chọn
+        selected: true, 
       };
 
       if (existingItem) {

@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { RootStackParamList } from "../../types/navigation";
+import { useAuth } from "../../hooks/useAuth";
+import AuthRequiredModal from "../../components/AuthRequiredModal";
 
 type CartScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -29,6 +31,8 @@ type CartScreenNavigationProp = StackNavigationProp<
 export default function CartScreen() {
   const navigation = useNavigation<CartScreenNavigationProp>();
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const { isAuthenticated } = useAuth();
+  const [showAuthModal, setShowAuthModal] = React.useState(false);
   const {
     removeItemFromCart,
     updateItemQuantity,
@@ -39,7 +43,6 @@ export default function CartScreen() {
     initializeCartSelection,
   } = useCartSync();
 
-  // Khởi tạo trường selected cho các sản phẩm hiện có
   useEffect(() => {
     if (cartItems.length > 0) {
       initializeCartSelection();
@@ -141,10 +144,7 @@ export default function CartScreen() {
       );
       return;
     }
-
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    // Điều hướng đến trang checkout với các sản phẩm đã chọn
     navigation.navigate("CheckoutScreen", {
       selectedItems: selectedItems,
       totalPrice: totalPrice,
@@ -240,6 +240,48 @@ export default function CartScreen() {
       </Text>
     </View>
   );
+
+  const renderNotLoggedIn = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="cart-outline" size={120} color="#E0E0E0" />
+      <Text style={styles.emptyTitle}>Cần đăng nhập</Text>
+      <Text style={styles.emptySubtitle}>
+        Vui lòng đăng nhập để xem các sản phẩm trong giỏ hàng
+      </Text>
+      <TouchableOpacity
+        style={styles.loginButton}
+        onPress={() => setShowAuthModal(true)}
+      >
+        <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Nếu chưa đăng nhập
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Giỏ hàng</Text>
+          </View>
+        </View>
+
+        {/* Content */}
+        {renderNotLoggedIn()}
+
+        <AuthRequiredModal
+          visible={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          title="Đăng nhập cần thiết"
+          message="Vui lòng đăng nhập để xem các sản phẩm trong giỏ hàng"
+        />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -643,5 +685,23 @@ const styles = StyleSheet.create({
   checkboxSelected: {
     backgroundColor: "#FF6B7D",
     borderColor: "#FF6B7D",
+  },
+  loginButton: {
+    backgroundColor: "#FF6B7D",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    elevation: 4,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });

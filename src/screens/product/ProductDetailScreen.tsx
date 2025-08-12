@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
+import { useAuth } from "../../hooks/useAuth";
+import AuthRequiredModal from "../../components/AuthRequiredModal";
 import { useCartSync } from "../../hooks/useCartSync";
 
 type ProductDetailRouteProp = RouteProp<
@@ -34,6 +36,8 @@ export default function ProductDetailScreen() {
   const navigation = useNavigation();
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const { addItemToCart } = useCartSync();
+  const { isAuthenticated } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const totalCartItems = cartItems.reduce(
     (sum, item) => sum + item.quantity,
@@ -99,10 +103,18 @@ export default function ProductDetailScreen() {
   };
 
   const onAddToCart = () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
     openQuantityModal();
   };
 
   const onBuyNow = () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     addItemToCart({
       id: product.id,
@@ -377,6 +389,13 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <AuthRequiredModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Đăng nhập cần thiết"
+        message="Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng"
+      />
     </View>
   );
 }

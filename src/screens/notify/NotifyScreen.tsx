@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getDatabase, ref, onValue, off, update } from "firebase/database";
+import { useAuth } from "../../hooks/useAuth";
+import AuthRequiredModal from "../../components/AuthRequiredModal";
 
 interface Notification {
   id: string;
@@ -30,6 +32,8 @@ interface NotifyScreenProps {
 }
 
 const NotifyScreen = ({ navigation }: NotifyScreenProps) => {
+  const { isAuthenticated } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -178,6 +182,49 @@ const NotifyScreen = ({ navigation }: NotifyScreenProps) => {
       </Text>
     </View>
   );
+
+  // Render UI yêu cầu đăng nhập
+  const renderNotLoggedIn = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="lock-closed-outline" size={120} color="#E0E0E0" />
+      <Text style={styles.emptyTitle}>Cần đăng nhập</Text>
+      <Text style={styles.emptySubtitle}>
+        Vui lòng đăng nhập để xem thông báo của bạn
+      </Text>
+      <TouchableOpacity
+        style={styles.loginButton}
+        onPress={() => setShowAuthModal(true)}
+      >
+        <Text style={styles.loginButtonText}>Đăng nhập ngay</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Nếu chưa đăng nhập
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Thông báo</Text>
+          </View>
+        </View>
+
+        {/* Content */}
+        {renderNotLoggedIn()}
+
+        <AuthRequiredModal
+          visible={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          title="Đăng nhập cần thiết"
+          message="Vui lòng đăng nhập để xem thông báo của bạn"
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -480,6 +527,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#fff",
     marginLeft: 4,
+  },
+  loginButton: {
+    backgroundColor: "#FF6B7D",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    elevation: 4,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
 
