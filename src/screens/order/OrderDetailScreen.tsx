@@ -7,17 +7,21 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Modal,
   SafeAreaView,
   StatusBar,
-  Alert,
+  Dimensions,
+  Animated,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { getOrder, Order } from "../../services/orderService";
+
+const { width } = Dimensions.get("window");
 
 type OrderDetailScreenRouteProp = RouteProp<any, any>;
 type OrderDetailScreenNavigationProp = StackNavigationProp<any, any>;
@@ -33,6 +37,37 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [processingCancel, setProcessingCancel] = useState(false);
+  const [animatedValue] = useState(new Animated.Value(0));
+
+  // Animation for modal
+  useEffect(() => {
+    if (cancelModalVisible) {
+      Animated.spring(animatedValue, {
+        toValue: 1,
+        friction: 7,
+        tension: 70,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(animatedValue, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [cancelModalVisible]);
+
+  const modalTranslateY = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  });
+
+  const modalOpacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   useEffect(() => {
     const fetchOrderDetail = async () => {
@@ -74,6 +109,7 @@ export default function OrderDetailScreen() {
       case "pending":
         return "#f39c12"; // Vàng
       case "confirmed":
+      case "processing":
         return "#3498db"; // Xanh dương
       case "shipped":
         return "#2ecc71"; // Xanh lá
@@ -92,6 +128,8 @@ export default function OrderDetailScreen() {
         return "Chờ xác nhận";
       case "confirmed":
         return "Đã xác nhận";
+      case "processing":
+        return "Đang xử lý";
       case "shipped":
         return "Đang giao hàng";
       case "delivered":
@@ -103,12 +141,27 @@ export default function OrderDetailScreen() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    try {
+      setProcessingCancel(true);
+      // Add your cancel order logic here
+      // For now, just close the modal
+      setCancelModalVisible(false);
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+    } finally {
+      setProcessingCancel(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
         return "time-outline";
       case "confirmed":
         return "checkmark-circle-outline";
+      case "processing":
+        return "construct-outline";
       case "shipped":
         return "car-outline";
       case "delivered":
@@ -187,10 +240,135 @@ export default function OrderDetailScreen() {
               {getStatusText(order.status)}
             </Text>
             <Text style={styles.statusDescription}>
-              Đơn hàng #{order.id?.slice(-8).toUpperCase() || ""}
+              {order.status === "pending" &&
+                "Đơn hàng của bạn đang chờ xác nhận"}
+              {order.status === "confirmed" &&
+                "Đơn hàng của bạn đã được xác nhận"}
+              {order.status === "processing" &&
+                "Đơn hàng của bạn đang được xử lý"}
+              {order.status === "shipped" && "Đơn hàng của bạn đang được giao"}
+              {order.status === "delivered" &&
+                "Đơn hàng của bạn đã được giao thành công"}
+              {order.status === "cancelled" && "Đơn hàng của bạn đã bị hủy"}
             </Text>
           </View>
         </View>
+
+        {/* Quick Info Bar */}
+        <View style={styles.quickInfoBar}>
+          <View style={styles.quickInfoItem}>
+            <Text style={styles.quickInfoLabel}>Mã đơn</Text>
+            <Text style={styles.quickInfoValue}>
+              #{order.id?.slice(-6).toUpperCase() || ""}
+            </Text>
+          </View>
+          <View style={styles.quickInfoDivider} />
+          <View style={styles.quickInfoItem}>
+            <Text style={styles.quickInfoLabel}>Ngày đặt</Text>
+            <Text style={styles.quickInfoValue}>
+              {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+            </Text>
+          </View>
+          <View style={styles.quickInfoDivider} />
+          <View style={styles.quickInfoItem}>
+            <Text style={styles.quickInfoLabel}>Tổng tiền</Text>
+            <Text style={styles.quickInfoValueTotal}>
+              {MONEY(order.totalAmount)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Order Timeline */}
+        {order.status && order.status !== "cancelled" && (
+          <View style={styles.timelineSection}>
+            <Text style={styles.sectionTitle}>Tiến trình đơn hàng</Text>
+            <View style={styles.timeline}>
+              <TimelineItem
+                title="Đặt hàng"
+                time={new Date(order.createdAt).toLocaleString("vi-VN")}
+                status="Hoàn thành"
+                isActive={true}
+                isFirst={true}
+              />
+              <TimelineItem
+                title="Xác nhận"
+                time={
+                  order.status === "confirmed" ||
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered"
+                    ? new Date(order.updatedAt).toLocaleString("vi-VN")
+                    : "Đang chờ"
+                }
+                status={
+                  order.status === "confirmed" ||
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered"
+                    ? "Hoàn thành"
+                    : "Đang chờ"
+                }
+                isActive={
+                  order.status === "confirmed" ||
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered"
+                }
+              />
+              <TimelineItem
+                title="Đang xử lý"
+                time={
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered"
+                    ? new Date(order.updatedAt).toLocaleString("vi-VN")
+                    : "Đang chờ"
+                }
+                status={
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered"
+                    ? "Hoàn thành"
+                    : "Đang chờ"
+                }
+                isActive={
+                  order.status === "processing" ||
+                  order.status === "shipped" ||
+                  order.status === "delivered"
+                }
+              />
+              <TimelineItem
+                title="Đang giao"
+                time={
+                  order.status === "shipped" || order.status === "delivered"
+                    ? new Date(order.updatedAt).toLocaleString("vi-VN")
+                    : "Đang chờ"
+                }
+                status={
+                  order.status === "shipped" || order.status === "delivered"
+                    ? "Hoàn thành"
+                    : "Đang chờ"
+                }
+                isActive={
+                  order.status === "shipped" || order.status === "delivered"
+                }
+              />
+              <TimelineItem
+                title="Đã giao"
+                time={
+                  order.status === "delivered"
+                    ? new Date(order.updatedAt).toLocaleString("vi-VN")
+                    : "Đang chờ"
+                }
+                status={
+                  order.status === "delivered" ? "Hoàn thành" : "Đang chờ"
+                }
+                isActive={order.status === "delivered"}
+                isLast={true}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Order Information */}
         <View style={styles.infoSection}>
@@ -198,7 +376,7 @@ export default function OrderDetailScreen() {
             <Ionicons
               name="information-circle-outline"
               size={20}
-              color="#FF6B7D"
+              color="#3498db"
             />
             <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
           </View>
@@ -241,7 +419,7 @@ export default function OrderDetailScreen() {
         {/* Order Items */}
         <View style={styles.itemsSection}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="cart-outline" size={20} color="#FF6B7D" />
+            <Ionicons name="cart-outline" size={20} color="#3498db" />
             <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
           </View>
 
@@ -268,24 +446,12 @@ export default function OrderDetailScreen() {
                 <Text style={styles.productPrice}>
                   {MONEY(parseFloat(item.price))}
                 </Text>
-                {item.selectedSize && (
-                  <Text style={styles.productDetail}>
-                    Size: {item.selectedSize}
-                  </Text>
-                )}
-                {item.selectedColor && (
-                  <Text style={styles.productDetail}>
-                    Màu: {item.selectedColor}
-                  </Text>
-                )}
+                <Text style={styles.productQuantity}>x{item.quantity}</Text>
               </View>
 
-              <View style={styles.productRight}>
-                <Text style={styles.productQuantity}>x{item.quantity}</Text>
-                <Text style={styles.productTotal}>
-                  {MONEY(parseFloat(item.price) * item.quantity)}
-                </Text>
-              </View>
+              <Text style={styles.productTotal}>
+                {MONEY(parseFloat(item.price) * item.quantity)}
+              </Text>
             </View>
           ))}
         </View>
@@ -293,13 +459,13 @@ export default function OrderDetailScreen() {
         {/* Order Summary */}
         <View style={styles.summarySection}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="receipt-outline" size={20} color="#FF6B7D" />
+            <Ionicons name="receipt-outline" size={20} color="#3498db" />
             <Text style={styles.sectionTitle}>Tổng hóa đơn</Text>
           </View>
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tiền hàng</Text>
+              <Text style={styles.summaryLabel}>Tạm tính</Text>
               <Text style={styles.summaryValue}>
                 {MONEY(order.itemsSubtotal)}
               </Text>
@@ -328,11 +494,177 @@ export default function OrderDetailScreen() {
           </View>
         </View>
 
-        <View style={{ height: 50 }} />
+        {/* Action Buttons */}
+        <View style={styles.actionSection}>
+          {order.status === "pending" && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setCancelModalVisible(true)}
+            >
+              <Ionicons
+                name="close-circle-outline"
+                size={20}
+                color="#e74c3c"
+                style={styles.buttonIcon}
+              />
+              <Text style={styles.cancelButtonText}>Hủy đơn hàng</Text>
+            </TouchableOpacity>
+          )}
+
+          {order.status === "delivered" && (
+            <TouchableOpacity
+              style={styles.reviewButton}
+              onPress={() => {
+                // Navigate to review screen
+                // navigation.navigate("WriteReview", { orderId: order.id });
+                console.log("Navigate to review screen");
+              }}
+            >
+              <Ionicons
+                name="star-outline"
+                size={20}
+                color="#f39c12"
+                style={styles.buttonIcon}
+              />
+              <Text style={styles.reviewButtonText}>Đánh giá sản phẩm</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.supportButton,
+              order.status === "pending" || order.status === "delivered"
+                ? {}
+                : { width: "100%" },
+            ]}
+          >
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={20}
+              color="white"
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.supportButtonText}>Liên hệ hỗ trợ</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Custom Cancel Order Modal */}
+      <Modal
+        transparent={true}
+        visible={cancelModalVisible}
+        onRequestClose={() => setCancelModalVisible(false)}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.modalContainer,
+              {
+                transform: [{ translateY: modalTranslateY }],
+                opacity: modalOpacity,
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <MaterialIcons name="error-outline" size={46} color="#e74c3c" />
+              <Text style={styles.modalTitle}>Xác nhận hủy đơn hàng</Text>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalText}>
+                Bạn có chắc chắn muốn hủy đơn hàng này không? Sau khi hủy, đơn
+                hàng sẽ không thể khôi phục.
+              </Text>
+
+              <View style={styles.orderSummaryInModal}>
+                <Text style={styles.orderIdInModal}>
+                  Mã đơn hàng: #{order.id?.slice(-6).toUpperCase() || ""}
+                </Text>
+                <Text style={styles.totalAmountInModal}>
+                  Giá trị: {MONEY(order.totalAmount)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setCancelModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Không, giữ lại</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={handleCancelOrder}
+                disabled={processingCancel}
+              >
+                {processingCancel ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.modalConfirmButtonText}>
+                    Có, hủy đơn hàng
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+// TimelineItem Component
+const TimelineItem = ({
+  title,
+  time,
+  status,
+  isActive,
+  isFirst = false,
+  isLast = false,
+}: {
+  title: string;
+  time: string;
+  status: string;
+  isActive: boolean;
+  isFirst?: boolean;
+  isLast?: boolean;
+}) => {
+  return (
+    <View style={styles.timelineItem}>
+      <View style={styles.timelineLeft}>
+        <View
+          style={[
+            styles.timelinePoint,
+            isActive ? styles.activePoint : styles.inactivePoint,
+          ]}
+        />
+        {!isLast && (
+          <View
+            style={[
+              styles.timelineLine,
+              isActive ? styles.activeLine : styles.inactiveLine,
+            ]}
+          />
+        )}
+      </View>
+      <View style={styles.timelineContent}>
+        <Text style={styles.timelineTitle}>{title}</Text>
+        <Text style={styles.timelineTime}>{time}</Text>
+        <Text
+          style={[
+            styles.timelineStatus,
+            { color: status === "Hoàn thành" ? "#2ecc71" : "#f39c12" },
+          ]}
+        >
+          {status}
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -375,7 +707,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   errorButton: {
-    backgroundColor: "#FF6B7D",
+    backgroundColor: "#3498db",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -405,6 +737,46 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
+  // Quick Info Bar
+  quickInfoBar: {
+    flexDirection: "row",
+    backgroundColor: "white",
+    marginTop: 16,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    padding: 16,
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  quickInfoItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  quickInfoDivider: {
+    width: 1,
+    backgroundColor: "#e0e0e0",
+    marginVertical: 5,
+  },
+  quickInfoLabel: {
+    fontSize: 12,
+    color: "#95a5a6",
+    marginBottom: 4,
+  },
+  quickInfoValue: {
+    fontSize: 14,
+    color: "#2c3e50",
+    fontWeight: "500",
+  },
+  quickInfoValueTotal: {
+    fontSize: 14,
+    color: "#e74c3c",
+    fontWeight: "700",
+  },
+
   // Status Section
   statusSection: {
     backgroundColor: "white",
@@ -414,11 +786,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
-    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statusIcon: {
     width: 50,
@@ -440,6 +812,78 @@ const styles = StyleSheet.create({
   statusDescription: {
     fontSize: 14,
     color: "#7f8c8d",
+    lineHeight: 20,
+  },
+
+  // Timeline Section
+  timelineSection: {
+    backgroundColor: "white",
+    padding: 16,
+    marginTop: 16,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  timeline: {
+    marginTop: 12,
+  },
+  timelineItem: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+  timelineLeft: {
+    width: 24,
+    alignItems: "center",
+  },
+  timelinePoint: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+  },
+  activePoint: {
+    backgroundColor: "#3498db",
+    borderColor: "#e1f0fa",
+  },
+  inactivePoint: {
+    backgroundColor: "#bdc3c7",
+    borderColor: "#ecf0f1",
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  activeLine: {
+    backgroundColor: "#3498db",
+  },
+  inactiveLine: {
+    backgroundColor: "#bdc3c7",
+  },
+  timelineContent: {
+    flex: 1,
+    paddingLeft: 16,
+    paddingBottom: 16,
+  },
+  timelineTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#2c3e50",
+    marginBottom: 4,
+  },
+  timelineTime: {
+    fontSize: 13,
+    color: "#7f8c8d",
+    marginBottom: 2,
+  },
+  timelineStatus: {
+    fontSize: 12,
+    fontWeight: "500",
   },
 
   // Section Styling
@@ -460,11 +904,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginHorizontal: 16,
     borderRadius: 12,
-    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   infoCard: {
     backgroundColor: "#f8fafc",
@@ -498,11 +942,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginHorizontal: 16,
     borderRadius: 12,
-    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   productItem: {
     flexDirection: "row",
@@ -523,28 +967,18 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
     color: "#2c3e50",
     marginBottom: 4,
   },
   productPrice: {
     fontSize: 13,
-    color: "#FF6B7D",
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  productDetail: {
-    fontSize: 12,
     color: "#7f8c8d",
-    marginBottom: 1,
-  },
-  productRight: {
-    alignItems: "flex-end",
+    marginBottom: 2,
   },
   productQuantity: {
     fontSize: 13,
     color: "#7f8c8d",
-    marginBottom: 4,
   },
   productTotal: {
     fontSize: 14,
@@ -559,11 +993,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginHorizontal: 16,
     borderRadius: 12,
-    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   summaryCard: {
     backgroundColor: "#f8fafc",
@@ -608,6 +1042,143 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#FF6B7D",
+    color: "#e74c3c",
+  },
+
+  // Action Section
+  actionSection: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#fff0f0",
+    borderWidth: 1,
+    borderColor: "#ffcece",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginRight: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#e74c3c",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  reviewButton: {
+    flex: 1,
+    backgroundColor: "#fff8e1",
+    borderWidth: 1,
+    borderColor: "#ffe082",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginRight: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reviewButtonText: {
+    color: "#f39c12",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  supportButton: {
+    flex: 1,
+    backgroundColor: "#3498db",
+    paddingVertical: 14,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  supportButtonText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContainer: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    elevation: 5,
+  },
+  modalHeader: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#2c3e50",
+    marginTop: 12,
+  },
+  modalBody: {
+    marginBottom: 20,
+  },
+  modalText: {
+    fontSize: 14,
+    color: "#7f8c8d",
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  orderSummaryInModal: {
+    backgroundColor: "#f8f9fa",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  orderIdInModal: {
+    fontSize: 14,
+    color: "#2c3e50",
+    fontWeight: "500",
+    marginBottom: 6,
+  },
+  totalAmountInModal: {
+    fontSize: 16,
+    color: "#e74c3c",
+    fontWeight: "bold",
+  },
+  modalFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: "#f5f6fa",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginRight: 12,
+  },
+  modalCancelButtonText: {
+    color: "#7f8c8d",
+    fontWeight: "600",
+  },
+  modalConfirmButton: {
+    flex: 1,
+    backgroundColor: "#e74c3c",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  modalConfirmButtonText: {
+    color: "white",
+    fontWeight: "600",
   },
 });

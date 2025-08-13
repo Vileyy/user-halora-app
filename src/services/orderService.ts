@@ -23,7 +23,13 @@ export interface Order {
   shippingMethod: "standard" | "express";
   paymentMethod: "cod" | "momo";
   appliedCoupon?: string | null;
-  status: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
+  status:
+    | "pending"
+    | "confirmed"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled";
   createdAt: string;
   updatedAt: string;
 }
@@ -175,7 +181,13 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
 export const updateOrderStatus = async (
   userId: string,
   orderId: string,
-  status: Order["status"]
+  status:
+    | "pending"
+    | "confirmed"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled"
 ): Promise<void> => {
   try {
     const orderRef = ref(database, `users/${userId}/orders/${orderId}`);

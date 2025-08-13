@@ -85,7 +85,7 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         // Navigate to purchase history screen
         break;
       case "orders":
-        // Navigate to order status screen
+        navigation.navigate("OrderStatusScreen");
         break;
       case "favorites":
         // Navigate to favorites screen
