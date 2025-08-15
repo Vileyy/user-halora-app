@@ -56,9 +56,11 @@ const cartSlice = createSlice({
         state.items.push(sanitizedPayload);
       }
     },
+
     removeFromCart: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.id !== action.payload);
     },
+    
     updateQuantity: (
       state,
       action: PayloadAction<{ id: string; quantity: number }>
@@ -71,39 +73,44 @@ const cartSlice = createSlice({
     clearCart: (state) => {
       state.items = [];
     },
+
     setCartItems: (state, action: PayloadAction<CartItem[]>) => {
       state.items = action.payload;
     },
-    // Thêm các action mới để quản lý việc chọn sản phẩm
+
     toggleItemSelection: (state, action: PayloadAction<string>) => {
       const item = state.items.find((item) => item.id === action.payload);
       if (item) {
         item.selected = !item.selected;
       }
     },
+
     selectAllItems: (state) => {
       state.items.forEach((item) => {
         item.selected = true;
       });
     },
+
     unselectAllItems: (state) => {
       state.items.forEach((item) => {
         item.selected = false;
       });
     },
+
     selectItem: (state, action: PayloadAction<string>) => {
       const item = state.items.find((item) => item.id === action.payload);
       if (item) {
         item.selected = true;
       }
     },
+
     unselectItem: (state, action: PayloadAction<string>) => {
       const item = state.items.find((item) => item.id === action.payload);
       if (item) {
         item.selected = false;
       }
     },
-    // Thêm action để khởi tạo trường selected cho các sản phẩm hiện có
+
     initializeSelected: (state) => {
       state.items.forEach((item) => {
         if (item.selected === undefined) {

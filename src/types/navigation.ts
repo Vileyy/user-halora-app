@@ -36,6 +36,7 @@ export type RootStackParamList = {
   OrderDetailScreen: { orderId: string };
   OrderTrackingScreen: { orderId: string };
   OrderStatusScreen: undefined;
+  EditProfileScreen: undefined;
 };
 
 export type TabParamList = {

@@ -20,10 +20,11 @@ import AuthRequiredModal from "../../components/AuthRequiredModal";
 interface User {
   uid: string;
   email: string;
-  phone: string;
-  status: string;
+  phone?: string;
+  status?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  displayName?: string;
   name?: string;
   avatar?: string;
 }
@@ -60,9 +61,8 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         setLoading(false);
       });
 
-      return unsubscribe; // Return cleanup function
+      return unsubscribe;
     } else {
-      // Nếu không có user đăng nhập, không redirect nữa
       setLoading(false);
     }
   };
@@ -76,7 +76,7 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
 
     switch (menuItem) {
       case "profile":
-        // Navigate to profile edit screen
+        navigation.navigate("EditProfileScreen");
         break;
       case "password":
         // Navigate to change password screen
@@ -109,10 +109,7 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         style: "destructive",
         onPress: async () => {
           try {
-            // Sign out from Firebase Auth
             await signOut(auth);
-
-            // Clear any stored user data/tokens here
             await AsyncStorage.multiRemove([
               "userToken",
               "userId",
@@ -138,6 +135,7 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
   };
 
   const getDisplayName = () => {
+    if (user?.displayName) return user.displayName;
     if (user?.name) return user.name;
     if (user?.email) {
       const namePart = user.email.split("@")[0];

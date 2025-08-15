@@ -13,6 +13,7 @@ import OrderSuccessScreen from "../screens/order/OrderSuccessScreen";
 import OrderDetailScreen from "../screens/order/OrderDetailScreen";
 import OrderTrackingScreen from "../screens/order/OrderTrackingScreen";
 import OrderStatusScreen from "../screens/order/OrderStatusScreen";
+import EditProfileScreen from "../screens/profile/EditProfileScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -75,6 +76,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="OrderStatusScreen"
           component={OrderStatusScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="EditProfileScreen"
+          component={EditProfileScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
