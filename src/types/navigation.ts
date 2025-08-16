@@ -4,7 +4,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   ProductListScreen: undefined;
   ProductDetailScreen: {
-    product: {
+    product?: {
       id: string;
       name: string;
       price: string;
@@ -12,6 +12,7 @@ export type RootStackParamList = {
       image: string;
       category: string;
     };
+    productId?: string;
   };
   ViewAllScreen: {
     category: string;
@@ -37,6 +38,8 @@ export type RootStackParamList = {
   OrderTrackingScreen: { orderId: string };
   OrderStatusScreen: undefined;
   EditProfileScreen: undefined;
+  ChangePasswordScreen: undefined;
+  OrderHistoryScreen: undefined;
 };
 
 export type TabParamList = {

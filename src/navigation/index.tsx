@@ -14,6 +14,8 @@ import OrderDetailScreen from "../screens/order/OrderDetailScreen";
 import OrderTrackingScreen from "../screens/order/OrderTrackingScreen";
 import OrderStatusScreen from "../screens/order/OrderStatusScreen";
 import EditProfileScreen from "../screens/profile/EditProfileScreen";
+import ChangePasswordScreen from "../screens/profile/ChangePasswordScreen";
+import OrderHistoryScreen from "../screens/order/OrderHistoryScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -58,6 +60,8 @@ export default function AppNavigator() {
           component={CheckoutScreen}
           options={{ headerShown: false }}
         />
+
+        {/* Order */}
         <Stack.Screen
           name="OrderSuccessScreen"
           component={OrderSuccessScreen}
@@ -78,9 +82,21 @@ export default function AppNavigator() {
           component={OrderStatusScreen}
           options={{ headerShown: false }}
         />
+
+        {/* Profile */}
         <Stack.Screen
           name="EditProfileScreen"
           component={EditProfileScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ChangePasswordScreen"
+          component={ChangePasswordScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="OrderHistoryScreen"
+          component={OrderHistoryScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

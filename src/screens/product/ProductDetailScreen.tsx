@@ -11,6 +11,7 @@ import {
   StatusBar,
   Modal,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
@@ -32,6 +33,10 @@ type ProductDetailRouteProp = RouteProp<
 export default function ProductDetailScreen() {
   const route = useRoute<ProductDetailRouteProp>();
   const { product } = route.params;
+
+  if (!product) {
+    return null; 
+  }
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const cartItems = useSelector((state: RootState) => state.cart.items);
@@ -97,9 +102,17 @@ export default function ProductDetailScreen() {
       description: product.description,
       image: product.image,
       category: product.category,
+      quantity: tempQuantity,
     });
     setShowQuantityModal(false);
-    Alert.alert("Đã thêm vào giỏ", `${product.name} x${tempQuantity}`);
+    Toast.show({
+      type: "success",
+      text1: "Đã thêm vào giỏ hàng",
+      text2: `${product.name} x${tempQuantity}`,
+      position: "top",
+      visibilityTime: 3000,
+      topOffset: 60,
+    });
   };
 
   const onAddToCart = () => {
@@ -123,16 +136,20 @@ export default function ProductDetailScreen() {
       description: product.description,
       image: product.image,
       category: product.category,
+      quantity: quantity,
     });
-    Alert.alert("Mua ngay", "Đang chuyển đến trang thanh toán...", [
-      {
-        text: "OK",
-        onPress: () => {
-          // TODO: Navigate to checkout screen
-          console.log("Navigate to checkout");
-        },
+    Toast.show({
+      type: "success",
+      text1: "Mua ngay",
+      text2: "Đang chuyển đến trang thanh toán...",
+      position: "top",
+      visibilityTime: 2000,
+      topOffset: 60,
+      onHide: () => {
+        // TODO: Navigate to checkout screen
+        console.log("Navigate to checkout");
       },
-    ]);
+    });
   };
 
   return (

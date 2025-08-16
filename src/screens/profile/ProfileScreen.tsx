@@ -79,10 +79,10 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         navigation.navigate("EditProfileScreen");
         break;
       case "password":
-        // Navigate to change password screen
+        navigation.navigate("ChangePasswordScreen");
         break;
       case "history":
-        // Navigate to purchase history screen
+        navigation.navigate("OrderHistoryScreen");
         break;
       case "orders":
         navigation.navigate("OrderStatusScreen");

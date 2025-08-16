@@ -6,6 +6,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { Ionicons } from "@expo/vector-icons";
 import { useCartSync } from "../hooks/useCartSync";
 import { CartItem } from "../redux/slices/cartSlice";
@@ -50,19 +51,24 @@ const AddToCartButton: React.FC<AddToCartButtonProps> = ({
       addItemToCart(product);
 
       // Hiển thị thông báo thành công
-      Alert.alert(
-        "Thành công",
-        "Sản phẩm đã được thêm vào giỏ hàng!",
-        [{ text: "OK" }],
-        { cancelable: true }
-      );
+      Toast.show({
+        type: "success",
+        text1: "Thành công",
+        text2: "Sản phẩm đã được thêm vào giỏ hàng!",
+        position: "top",
+        visibilityTime: 3000,
+        topOffset: 60,
+      });
     } catch (error) {
       console.error("Error adding to cart:", error);
-      Alert.alert(
-        "Lỗi",
-        "Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.",
-        [{ text: "OK" }]
-      );
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: "Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.",
+        position: "top",
+        visibilityTime: 3000,
+        topOffset: 60,
+      });
     } finally {
       setIsLoading(false);
     }

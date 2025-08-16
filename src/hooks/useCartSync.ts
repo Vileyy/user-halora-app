@@ -31,7 +31,7 @@ export const useCartSync = () => {
   useEffect(() => {
     if (!isAuthenticated || !user || isLoaded.current) return;
 
-    console.log("🔄 Loading cart from Firebase for user:", user.uid);
+    // console.log("🔄 Loading cart from Firebase for user:", user.uid);
 
     const loadCartFromFirebase = async () => {
       try {
@@ -39,7 +39,7 @@ export const useCartSync = () => {
         const snapshot = await get(cartRef);
         const data = snapshot.val();
 
-        console.log("📦 Firebase cart data:", data);
+        // console.log("📦 Firebase cart data:", data);
 
         if (data && Array.isArray(data) && data.length > 0) {
           console.log("✅ Loading existing cart items:", data);
@@ -67,7 +67,7 @@ export const useCartSync = () => {
   useEffect(() => {
     if (!isAuthenticated || !user || !shouldSync.current) return;
 
-    console.log("💾 Syncing cart to Firebase:", cartItems);
+    // console.log("💾 Syncing cart to Firebase:", cartItems);
     const cartRef = ref(database, `users/${user.uid}/cart`);
     set(cartRef, cartItems)
       .then(() => {
@@ -87,10 +87,10 @@ export const useCartSync = () => {
   }, [isAuthenticated]);
 
   // Các hàm thao tác với giỏ hàng
-  const addItemToCart = (product: Omit<CartItem, "quantity">) => {
+  const addItemToCart = (product: Omit<CartItem, "selected"> | CartItem) => {
     const cartItem: CartItem = {
       ...product,
-      quantity: 1,
+      quantity: product.quantity || 1,
       selected: true,
     };
     dispatch(addToCart(cartItem));
