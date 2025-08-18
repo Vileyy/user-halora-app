@@ -47,7 +47,7 @@ const cartSlice = createSlice({
         image: action.payload.image || "",
         category: action.payload.category || "Other",
         description: action.payload.description || "",
-        selected: true, 
+        selected: true,
       };
 
       if (existingItem) {
@@ -60,7 +60,19 @@ const cartSlice = createSlice({
     removeFromCart: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.id !== action.payload);
     },
-    
+
+    removeSelectedItems: (state, action: PayloadAction<string[]>) => {
+      state.items = state.items.filter(
+        (item) => !action.payload.includes(item.id)
+      );
+    },
+
+    keepOnlySelectedItems: (state, action: PayloadAction<string[]>) => {
+      state.items = state.items.filter((item) =>
+        action.payload.includes(item.id)
+      );
+    },
+
     updateQuantity: (
       state,
       action: PayloadAction<{ id: string; quantity: number }>
@@ -124,6 +136,8 @@ const cartSlice = createSlice({
 export const {
   addToCart,
   removeFromCart,
+  removeSelectedItems,
+  keepOnlySelectedItems,
   updateQuantity,
   clearCart,
   setCartItems,

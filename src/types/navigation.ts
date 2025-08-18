@@ -40,6 +40,10 @@ export type RootStackParamList = {
   EditProfileScreen: undefined;
   ChangePasswordScreen: undefined;
   OrderHistoryScreen: undefined;
+  VoucherScreen: {
+    currentTotal?: number;
+    onVoucherSelect?: (voucherCode: string) => void;
+  };
 };
 
 export type TabParamList = {

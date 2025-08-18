@@ -19,10 +19,11 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
-import { clearCart } from "../../redux/slices/cartSlice";
+import { clearCart, removeSelectedItems } from "../../redux/slices/cartSlice";
 import {
   createOrder,
   clearUserCart,
+  removeItemsFromUserCart,
   getUserOrdersDebug,
 } from "../../services/orderService";
 
@@ -66,10 +67,7 @@ export default function CheckoutScreen() {
     "standard"
   );
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "momo">("cod");
-
-  // Giá trị cốt lõi
   const itemsSubtotal = useMemo(() => {
-    // tin tưởng totalPrice nếu truyền từ giỏ; fallback tính lại từ selectedItems
     if (typeof totalPrice === "number") return totalPrice;
     return selectedItems.reduce(
       (sum, it) => sum + parseMoney(it.price) * (it.quantity || 1),
@@ -105,7 +103,6 @@ export default function CheckoutScreen() {
       Alert.alert("Lỗi", "Vui lòng nhập mã giảm giá");
       return;
     }
-    // Demo rule: HALORA10 (-10% hàng), HALORA30K (-30.000₫), FREESHIP (miễn phí ship)
     if (!["HALORA10", "HALORA30K", "FREESHIP"].includes(code)) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Không hợp lệ", "Mã giảm giá không tồn tại");
@@ -147,8 +144,6 @@ export default function CheckoutScreen() {
                     category: item.category || "Other",
                     quantity: item.quantity,
                   };
-
-                  // Chỉ thêm selectedSize và selectedColor nếu chúng không undefined
                   if (item.selectedSize !== undefined) {
                     orderItem.selectedSize = item.selectedSize;
                   }
@@ -171,23 +166,22 @@ export default function CheckoutScreen() {
                 "Creating order with data:",
                 JSON.stringify(orderData, null, 2)
               );
-
-              // Lưu order vào Firebase với cấu trúc: users/{userId}/orders/{orderId}
               const orderId = await createOrder(user.uid, orderData);
-              console.log("Order created successfully with ID:", orderId);
-
-              // Debug: Kiểm tra tất cả orders của user trong Firebase
               await getUserOrdersDebug(user.uid);
 
-              // CHỈ XÓA CART SAU KHI ORDER ĐÃ ĐƯỢC TẠO THÀNH CÔNG
+              const purchasedItemIds = selectedItems.map((item) => item.id);
+              try {
+                await removeItemsFromUserCart(user.uid, purchasedItemIds);
+                await new Promise((resolve) => setTimeout(resolve, 500));
 
-              // Xóa cart từ Redux
-              dispatch(clearCart());
-              console.log("Cart cleared from Redux");
-
-              // Xóa cart từ Firebase
-              await clearUserCart(user.uid);
-              console.log("Cart cleared from Firebase");
+                dispatch(removeSelectedItems(purchasedItemIds));
+              } catch (cartError) {
+                console.error("Error removing items from cart:", cartError);
+                Alert.alert(
+                  "Thông báo",
+                  "Đơn hàng đã được tạo thành công nhưng có lỗi khi cập nhật giỏ hàng. Vui lòng kiểm tra lại giỏ hàng."
+                );
+              }
 
               // Navigate đến OrderSuccessScreen
               (navigation as any).navigate("OrderSuccessScreen", {
@@ -198,7 +192,6 @@ export default function CheckoutScreen() {
             } catch (error) {
               console.error("Error placing order:", error);
 
-              // Hiển thị lỗi chi tiết hơn
               let errorMessage = "Không thể đặt hàng. Vui lòng thử lại.";
               if (error instanceof Error) {
                 errorMessage = error.message;
@@ -259,9 +252,28 @@ export default function CheckoutScreen() {
           {selectedItems.map(renderProductItem)}
         </View>
 
-        {/* Mã giảm giá */}
+        {/* Halora Voucher */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mã giảm giá</Text>
+          <Text style={styles.sectionTitle}>Halora Voucher</Text>
+          <TouchableOpacity
+            style={styles.voucherButtonFullWidth}
+            onPress={() => {
+              navigation.navigate("VoucherScreen", {
+                currentTotal: itemsSubtotal,
+                onVoucherSelect: (voucherCode: string) => {
+                  setCouponCode(voucherCode);
+                  setAppliedCoupon(voucherCode);
+                },
+              });
+            }}
+          >
+            <View style={styles.voucherButtonContent}>
+              <Ionicons name="gift-outline" size={18} color="#FF6B7D" />
+              <Text style={styles.voucherButtonText}>Chọn voucher có sẵn</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#FF6B7D" />
+          </TouchableOpacity>
+
           <View style={styles.couponContainer}>
             <View style={styles.couponInputContainer}>
               <Ionicons name="pricetag-outline" size={20} color="#666" />
@@ -546,6 +558,56 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: "bold",
     color: "#1a1a1a",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  voucherButtonFullWidth: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF8F9",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFE2E6",
+    elevation: 1,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    marginBottom: 16,
+  },
+  voucherButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  voucherButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF8F9",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#FFE2E6",
+    elevation: 1,
+    shadowColor: "#FF6B7D",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  voucherButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FF6B7D",
+    letterSpacing: 0.2,
   },
   sectionBadge: {
     fontSize: 12,

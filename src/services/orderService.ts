@@ -86,10 +86,10 @@ export const createOrder = async (
 
     // Loại bỏ tất cả undefined values trước khi lưu vào Firebase
     const cleanOrder = removeUndefinedValues(order);
-    console.log(
-      "🔥 Clean order (no undefined values):",
-      JSON.stringify(cleanOrder, null, 2)
-    );
+    // console.log(
+    //   "🔥 Clean order (no undefined values):",
+    //   JSON.stringify(cleanOrder, null, 2)
+    // );
 
     console.log("🔥 Attempting to write to Firebase...");
     await set(newOrderRef, cleanOrder);
@@ -214,6 +214,59 @@ export const clearUserCart = async (userId: string): Promise<void> => {
   } catch (error) {
     console.error("Error clearing cart:", error);
     throw new Error("Không thể xóa giỏ hàng.");
+  }
+};
+
+/**
+ * Xóa specific items khỏi cart sau khi đặt hàng thành công
+ * Path: users/{userId}/cart
+ */
+export const removeItemsFromUserCart = async (
+  userId: string,
+  itemIds: string[]
+): Promise<void> => {
+  try {
+    console.log("🔥 Removing specific items from cart for user:", userId);
+    console.log("🔥 Items to remove:", itemIds);
+
+    const cartRef = ref(database, `users/${userId}/cart`);
+    const snapshot = await get(cartRef);
+
+    if (snapshot.exists()) {
+      const currentCart = snapshot.val();
+      console.log("🔥 Current cart:", currentCart);
+
+      // Filter out the items that were purchased
+      console.log("🔥 Current cart keys:", Object.keys(currentCart));
+      console.log("🔥 Items to remove (itemIds):", itemIds);
+
+      const updatedCart = Object.keys(currentCart)
+        .filter((key) => {
+          const shouldKeep = !itemIds.includes(key);
+          console.log(`🔥 Key: ${key}, shouldKeep: ${shouldKeep}`);
+          return shouldKeep;
+        })
+        .reduce((obj: any, key) => {
+          obj[key] = currentCart[key];
+          return obj;
+        }, {});
+
+      console.log("🔥 Updated cart after removing items:", updatedCart);
+
+      // If cart is empty after removing items, set to null, otherwise update with remaining items
+      if (Object.keys(updatedCart).length === 0) {
+        await set(cartRef, null);
+        console.log("🔥 Cart is now empty, set to null");
+      } else {
+        await set(cartRef, updatedCart);
+        console.log("🔥 Cart updated with remaining items");
+      }
+    } else {
+      console.log("🔥 No cart found for user");
+    }
+  } catch (error) {
+    console.error("Error removing items from cart:", error);
+    throw new Error("Không thể xóa sản phẩm khỏi giỏ hàng.");
   }
 };
 
