@@ -13,6 +13,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Keyboard,
+  SafeAreaView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,8 +34,8 @@ interface User {
   displayName?: string;
   name?: string;
   avatar?: string;
-  address?: string; // Legacy field - for backward compatibility
-  addressData?: AddressData; // New structured address
+  address?: string; 
+  addressData?: AddressData; 
   dateOfBirth?: string;
   gender?: string;
 }
@@ -138,7 +139,6 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
         return;
       }
 
-      // Validate required fields
       if (!formData.name.trim()) {
         Alert.alert("Lỗi", "Vui lòng nhập họ tên");
         return;
@@ -230,7 +230,6 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
         console.error("Cloudinary config:", cloudinaryService.getConfig());
         return;
       }
-
       // Upload avatar lên Cloudinary
       let cloudinaryUrl: string;
 
@@ -241,8 +240,6 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
         );
       } catch (uploadError) {
         console.log("Upload avatar failed, trying simple upload:", uploadError);
-
-        // Fallback: thử simple upload
         cloudinaryUrl = await cloudinaryService.simpleUpload(imageUri);
       }
 
@@ -347,7 +344,7 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <SafeAreaView style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -356,7 +353,7 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
         <View style={styles.placeholder} />
-      </View>
+      </SafeAreaView>
 
       <ScrollView
         ref={scrollViewRef}
@@ -523,7 +520,7 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
         />
       )}
 
-      {/* iOS Date Picker Modal Overlay */}
+      {/* Date Picker Modal */}
       {Platform.OS === "ios" && showDatePicker && (
         <View style={styles.datePickerModal}>
           <View style={styles.datePickerContainer}>

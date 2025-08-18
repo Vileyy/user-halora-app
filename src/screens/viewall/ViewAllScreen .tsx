@@ -115,7 +115,6 @@ export default function ViewAllScreen() {
   // Products loaded animation with staggered fade in down
   useEffect(() => {
     if (!loading && products.length > 0) {
-      // Create animation values for each product
       const animations = products.map(() => new Animated.Value(0));
       setItemAnimations(animations);
 
@@ -130,7 +129,7 @@ export default function ViewAllScreen() {
         // Animate each item with fade in down effect
         animations.forEach((anim, index) => {
           Animated.sequence([
-            Animated.delay(index * 120), // 120ms delay between each item
+            Animated.delay(index * 120), 
             Animated.parallel([
               Animated.timing(anim, {
                 toValue: 1,
@@ -149,7 +148,7 @@ export default function ViewAllScreen() {
   useEffect(() => {
     Animated.spring(sortOptionsHeight, {
       toValue: showSortOptions ? 250 : 0,
-      useNativeDriver: false, // height animation can't use native driver
+      useNativeDriver: false, 
     }).start();
   }, [showSortOptions]);
 
