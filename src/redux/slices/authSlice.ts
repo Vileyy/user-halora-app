@@ -3,9 +3,12 @@ import { createSlice } from "@reduxjs/toolkit";
 interface UserData {
   uid: string;
   email: string;
-  phone: string;
+  phone?: string;
   createdAt: string;
   updatedAt: string;
+  displayName?: string;
+  photoURL?: string;
+  provider?: string;
 }
 
 interface AuthState {
@@ -13,6 +16,7 @@ interface AuthState {
   password: string;
   error: string | null;
   user: UserData | null;
+  isGoogleSigningIn: boolean;
 }
 
 const initialState: AuthState = {
@@ -20,6 +24,7 @@ const initialState: AuthState = {
   password: "",
   error: null,
   user: null,
+  isGoogleSigningIn: false,
 };
 
 const authSlice = createSlice({
@@ -41,9 +46,18 @@ const authSlice = createSlice({
     clearUser: (state) => {
       state.user = null;
     },
+    setGoogleSigningIn: (state, action) => {
+      state.isGoogleSigningIn = action.payload;
+    },
   },
 });
 
-export const { setEmail, setPassword, setError, setUser, clearUser } =
-  authSlice.actions;
+export const {
+  setEmail,
+  setPassword,
+  setError,
+  setUser,
+  clearUser,
+  setGoogleSigningIn,
+} = authSlice.actions;
 export default authSlice.reducer;

@@ -11,6 +11,10 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
+// @ts-ignore
+import Icon from "react-native-vector-icons/FontAwesome";
+// @ts-ignore
+import AntDesign from "react-native-vector-icons/AntDesign";
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -18,13 +22,22 @@ import {
   setPassword,
   setError,
   setUser,
+  setGoogleSigningIn,
 } from "../../redux/slices/authSlice";
 import { useNavigation } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { ref, get } from "firebase/database";
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithCredential,
+} from "firebase/auth";
+import { ref, get, set } from "firebase/database";
 import { auth, database } from "../../services/firebase";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import { RootStackParamList } from "../../types/navigation";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Toast from "react-native-toast-message";
@@ -37,7 +50,7 @@ type LoginScreenNavigationProp = StackNavigationProp<
 export default function LoginScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { email, password, error } = useSelector(
+  const { email, password, error, isGoogleSigningIn } = useSelector(
     (state: RootState) => state.auth
   );
 
@@ -51,6 +64,15 @@ export default function LoginScreen() {
   const passwordLabelAnim = useRef(new Animated.Value(0)).current;
   const emailBorderAnim = useRef(new Animated.Value(0)).current;
   const passwordBorderAnim = useRef(new Animated.Value(0)).current;
+
+  // Google Sign-In
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId:
+        "1029103419885-dv28mm1cepi33c4vgpabfn2s0o1sbb7v.apps.googleusercontent.com",
+      forceCodeForRefreshToken: true, 
+    });
+  }, []);
 
   // Animate email label
   useEffect(() => {
@@ -161,6 +183,87 @@ export default function LoginScreen() {
       });
 
       dispatch(setError("Đăng nhập thất bại"));
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      dispatch(setGoogleSigningIn(true));
+      dispatch(setError(null));
+
+      // Check service Google Play
+      await GoogleSignin.hasPlayServices();
+
+      const userInfo = await GoogleSignin.signIn({
+        loginHint: "", 
+      });
+
+      if (userInfo.data?.idToken) {
+        const credential = GoogleAuthProvider.credential(userInfo.data.idToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        const firebaseUser = userCredential.user;
+
+        console.log("✅ Login thành công:", firebaseUser);
+
+        // Chuẩn bị dữ liệu user
+        const userData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName || "",
+          photoURL: firebaseUser.photoURL || "",
+          provider: "google",
+          phone: "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Kiểm tra xem user đã tồn tại trong database 
+        const userRef = ref(database, `users/${firebaseUser.uid}`);
+        const snapshot = await get(userRef);
+
+        if (!snapshot.exists()) {
+          await set(userRef, userData);
+        } else {
+          const existingData = snapshot.val();
+          const updatedData = {
+            ...existingData,
+            displayName: firebaseUser.displayName || existingData.displayName,
+            photoURL: firebaseUser.photoURL || existingData.photoURL,
+            updatedAt: new Date().toISOString(),
+          };
+          await set(userRef, updatedData);
+          userData.phone = existingData.phone || "";
+          userData.createdAt = existingData.createdAt;
+        }
+
+        // Lưu thông tin user vào Redux state
+        dispatch(setUser(userData));
+
+        dispatch(setGoogleSigningIn(false));
+
+        Toast.show({
+          type: "success",
+          text1: "Đăng nhập Google thành công!",
+          text2: `Chào mừng ${userData.displayName || userData.email}`,
+          position: "top",
+          visibilityTime: 3000,
+        });
+
+        navigation.navigate("MainTabs");
+      }
+    } catch (error: any) {
+      dispatch(setGoogleSigningIn(false));
+      console.error("❌ Lỗi đăng nhập:", error);
+
+      Toast.show({
+        type: "error",
+        text1: "Lỗi đăng nhập Google!",
+        text2: error.message || "Đăng nhập thất bại",
+        position: "top",
+        visibilityTime: 4000,
+      });
+
+      dispatch(setError(error.message));
     }
   };
 
@@ -308,20 +411,29 @@ export default function LoginScreen() {
             <View style={styles.socialButtons}>
               <TouchableOpacity
                 style={[styles.socialButton, styles.googleButton]}
+                activeOpacity={0.8}
+                onPress={handleGoogleSignIn}
+                disabled={isGoogleSigningIn}
               >
-                <Text style={styles.socialButtonText}>G</Text>
+                {isGoogleSigningIn ? (
+                  <ActivityIndicator color="#DB4437" size="small" />
+                ) : (
+                  <Icon name="google" size={24} color="#DB4437" />
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.socialButton, styles.facebookButton]}
+                activeOpacity={0.8}
               >
-                <Text style={styles.socialButtonText}>f</Text>
+                <Icon name="facebook" size={24} color="#4267B2" />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.socialButton, styles.appleButton]}
+                activeOpacity={0.8}
               >
-                <Text style={styles.socialButtonText}>🍎</Text>
+                <AntDesign name="apple1" size={24} color="#000" />
               </TouchableOpacity>
             </View>
           </View>
@@ -470,7 +582,7 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginTop: 10,
+    marginTop: -10,
   },
   forgotPasswordText: {
     color: "#333",
@@ -498,30 +610,38 @@ const styles = StyleSheet.create({
   socialButtons: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 20,
+    gap: 25,
+    marginTop: 5,
   },
   socialButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#fff",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "#E0E0E0",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   googleButton: {
     borderColor: "#DB4437",
+    shadowColor: "#DB4437",
   },
   facebookButton: {
     borderColor: "#4267B2",
+    shadowColor: "#4267B2",
   },
   appleButton: {
     borderColor: "#000",
-  },
-  socialButtonText: {
-    fontSize: 18,
-    fontWeight: "bold",
+    shadowColor: "#000",
   },
   loginButton: {
     backgroundColor: "#FF99CC",
