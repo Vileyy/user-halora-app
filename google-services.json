@@ -1,0 +1,44 @@
+{
+  "project_info": {
+    "project_number": "1029103419885",
+    "firebase_url": "https://user-halora-app-default-rtdb.firebaseio.com",
+    "project_id": "user-halora-app",
+    "storage_bucket": "user-halora-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1029103419885:android:your-app-id",
+        "android_client_info": {
+          "package_name": "com.viley.userhaloraapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1029103419885-iqcquo983spkugqhdcqeu5p6l1th3g8d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.viley.userhaloraapp",
+            "certificate_hash": "SHA1_HASH_PLACEHOLDER"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "YOUR_API_KEY_HERE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1029103419885-iqcquo983spkugqhdcqeu5p6l1th3g8d.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
