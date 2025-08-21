@@ -121,7 +121,7 @@ const FlashDeals: React.FC = () => {
 
   // Xử lý khi bấm vào sản phẩm
   const handlePress = (product: FlashDealItem) => {
-    console.log("Product pressed:", product);
+    // console.log("Product pressed:", product);
     navigation.navigate("ProductDetailScreen", { product });
   };
 

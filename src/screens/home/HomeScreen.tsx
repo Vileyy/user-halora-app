@@ -30,7 +30,7 @@ export default function HomeScreen() {
   };
 
   const handleViewMorePress = () => {
-    console.log("View more pressed");
+    // console.log("View more pressed");
   };
 
   return (

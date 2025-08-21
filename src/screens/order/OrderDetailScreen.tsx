@@ -15,11 +15,12 @@ import {
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
-import { getOrder, Order } from "../../services/orderService";
+import { getOrder, Order, cancelOrder } from "../../services/orderService";
 
 const { width } = Dimensions.get("window");
 
@@ -78,23 +79,23 @@ export default function OrderDetailScreen() {
           return;
         }
 
-        console.log(
-          "🔥 Fetching order details for:",
-          orderId,
-          "user:",
-          user.uid
-        );
+        // console.log(
+        //   "🔥 Fetching order details for:",
+        //   orderId,
+        //   "user:",
+        //   user.uid
+        // );
         const orderData = await getOrder(user.uid, orderId);
 
         if (orderData) {
-          console.log("🔥 Order found:", orderData);
+          // console.log("🔥 Order found:", orderData);
           setOrder(orderData);
         } else {
-          console.log("🔥 Order not found");
+          // console.log("🔥 Order not found");
           setError("Không tìm thấy thông tin đơn hàng");
         }
       } catch (error) {
-        console.error("🔥 Error fetching order:", error);
+        // console.error("🔥 Error fetching order:", error);
         setError("Không thể tải thông tin đơn hàng. Vui lòng thử lại sau.");
       } finally {
         setLoading(false);
@@ -144,14 +145,44 @@ export default function OrderDetailScreen() {
   const handleCancelOrder = async () => {
     try {
       setProcessingCancel(true);
-      // Add your cancel order logic here
-      // For now, just close the modal
+
+      if (!user || !order?.id) {
+        throw new Error("Không có thông tin người dùng hoặc đơn hàng");
+      }
+
+      await cancelOrder(user.uid, order.id);
+
+      // Cập nhật state local
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "cancelled",
+              updatedAt: new Date().toISOString(),
+            }
+          : null
+      );
+
       setCancelModalVisible(false);
+      Toast.show({
+        text1: "Đã hủy đơn hàng thành công",
+        type: "success",
+      });
     } catch (error) {
       console.error("Error cancelling order:", error);
+      // Có thể thêm alert thông báo lỗi ở đây
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Không thể hủy đơn hàng. Vui lòng thử lại."
+      );
     } finally {
       setProcessingCancel(false);
     }
+  };
+
+  const handleReorder = () => {
+    navigation.navigate("MainTabs");
   };
 
   const getStatusIcon = (status: string) => {
@@ -249,7 +280,8 @@ export default function OrderDetailScreen() {
               {order.status === "shipped" && "Đơn hàng của bạn đang được giao"}
               {order.status === "delivered" &&
                 "Đơn hàng của bạn đã được giao thành công"}
-              {order.status === "cancelled" && "Đơn hàng của bạn đã bị hủy"}
+              {order.status === "cancelled" &&
+                "Đơn hàng đã bị hủy. Bạn có thể đặt mua lại các sản phẩm này."}
             </Text>
           </View>
         </View>
@@ -496,7 +528,8 @@ export default function OrderDetailScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionSection}>
-          {order.status === "pending" && (
+          {/* Nút Hủy đơn hàng - chỉ hiển thị khi status là pending hoặc confirmed */}
+          {(order.status === "pending" || order.status === "confirmed") && (
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => setCancelModalVisible(true)}
@@ -511,6 +544,7 @@ export default function OrderDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Nút Đánh giá sản phẩm - chỉ hiển thị khi status là delivered */}
           {order.status === "delivered" && (
             <TouchableOpacity
               style={styles.reviewButton}
@@ -530,10 +564,31 @@ export default function OrderDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Nút Mua lại - chỉ hiển thị khi status là cancelled */}
+          {order.status === "cancelled" && (
+            <TouchableOpacity
+              style={styles.reorderButton}
+              onPress={handleReorder}
+            >
+              <Ionicons
+                name="refresh-outline"
+                size={20}
+                color="#2ecc71"
+                style={styles.buttonIcon}
+              />
+              <Text style={styles.reorderButtonText}>Mua lại</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Nút Liên hệ hỗ trợ - luôn hiển thị */}
           <TouchableOpacity
             style={[
               styles.supportButton,
-              order.status === "pending" || order.status === "delivered"
+              // Điều chỉnh width dựa trên số lượng nút hiển thị
+              order.status === "pending" ||
+              order.status === "confirmed" ||
+              order.status === "delivered" ||
+              order.status === "cancelled"
                 ? {}
                 : { width: "100%" },
             ]}
@@ -1083,6 +1138,23 @@ const styles = StyleSheet.create({
   },
   reviewButtonText: {
     color: "#f39c12",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  reorderButton: {
+    flex: 1,
+    backgroundColor: "#e8f5e8",
+    borderWidth: 1,
+    borderColor: "#a8d8a8",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginRight: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reorderButtonText: {
+    color: "#2ecc71",
     fontWeight: "600",
     fontSize: 14,
   },

@@ -126,16 +126,16 @@ export const getOrder = async (
   orderId: string
 ): Promise<Order | null> => {
   try {
-    console.log("🔥 Getting order:", orderId, "for user:", userId);
+    // console.log("🔥 Getting order:", orderId, "for user:", userId);
     const orderRef = ref(database, `users/${userId}/orders/${orderId}`);
     const snapshot = await get(orderRef);
 
     if (snapshot.exists()) {
-      console.log("🔥 Order found:", snapshot.val());
+      // console.log("🔥 Order found:", snapshot.val());
       return snapshot.val() as Order;
     }
 
-    console.log("🔥 Order not found");
+    // console.log("🔥 Order not found");
     return null;
   } catch (error) {
     console.error("Error getting order:", error);
@@ -149,7 +149,7 @@ export const getOrder = async (
  */
 export const getUserOrders = async (userId: string): Promise<Order[]> => {
   try {
-    console.log("🔥 Getting all orders for user:", userId);
+    // console.log("🔥 Getting all orders for user:", userId);
     const userOrdersRef = ref(database, `users/${userId}/orders`);
     const snapshot = await get(userOrdersRef);
 
@@ -157,7 +157,7 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
       const ordersData = snapshot.val();
       const orders = Object.values(ordersData) as Order[];
 
-      console.log("🔥 Found orders:", orders.length);
+      // console.log("🔥 Found orders:", orders.length);
 
       // Sắp xếp theo thời gian tạo (mới nhất trước)
       return orders.sort(
@@ -166,7 +166,7 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
       );
     }
 
-    console.log("🔥 No orders found for user");
+    // console.log("🔥 No orders found for user");
     return [];
   } catch (error) {
     console.error("Error getting user orders:", error);
@@ -198,6 +198,53 @@ export const updateOrderStatus = async (
   } catch (error) {
     console.error("Error updating order status:", error);
     throw new Error("Không thể cập nhật trạng thái đơn hàng.");
+  }
+};
+
+/**
+ * Hủy đơn hàng - cập nhật trạng thái thành cancelled
+ * Path: users/{userId}/orders/{orderId}
+ */
+export const cancelOrder = async (
+  userId: string,
+  orderId: string
+): Promise<void> => {
+  try {
+    // console.log("🔥 Cancelling order:", orderId, "for user:", userId);
+
+    // Lấy thông tin đơn hàng hiện tại
+    const orderRef = ref(database, `users/${userId}/orders/${orderId}`);
+    const snapshot = await get(orderRef);
+
+    if (!snapshot.exists()) {
+      throw new Error("Không tìm thấy đơn hàng");
+    }
+
+    const currentOrder = snapshot.val() as Order;
+
+    // Kiểm tra xem đơn hàng có thể hủy không
+    if (
+      currentOrder.status !== "pending" &&
+      currentOrder.status !== "confirmed"
+    ) {
+      throw new Error("Không thể hủy đơn hàng đang được xử lý hoặc đã giao");
+    }
+
+    // Cập nhật trạng thái thành cancelled
+    const updatedOrder = {
+      ...currentOrder,
+      status: "cancelled" as const,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await set(orderRef, updatedOrder);
+    // console.log("🔥 Order cancelled successfully");
+  } catch (error) {
+    console.error("Error cancelling order:", error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Không thể hủy đơn hàng. Vui lòng thử lại.");
   }
 };
 

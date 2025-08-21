@@ -104,10 +104,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
     onClose();
   };
 
-  if (
-    !visible ||
-    (!loading && filteredProducts.length === 0 && searchText.trim())
-  ) {
+  if (!visible || !searchText.trim()) {
     return null;
   }
 
@@ -169,10 +166,10 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 100, // Position below the search bar
+    top: 60, // Position below the search bar
     left: 10,
     right: 10,
-    zIndex: 1000,
+    zIndex: 1001,
   },
   dropdown: {
     backgroundColor: "white",

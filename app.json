@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "user-halora-app",
+    "name": "Halora Cosmetic",
     "slug": "user-halora-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/halora_cosmestic.png",
+    "icon": "./assets/halora-icon-logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/halora_cosmestic.png",
+      "image": "./assets/halora-icon-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/halora_cosmestic.png",
+        "foregroundImage": "./assets/halora-icon-logo.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -26,7 +26,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["@react-native-google-signin/google-signin"],
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ],
     "extra": {
       "eas": {
         "projectId": "8662ee86-2638-42d1-b63b-b277d7a1ac94"
@@ -34,6 +36,7 @@
       "googleSignIn": {
         "androidClientId": "1029103419885-iqcquo983spkugqhdcqeu5p6l1th3g8d.apps.googleusercontent.com"
       }
-    }
+    },
+    "owner": "viley"
   }
 }

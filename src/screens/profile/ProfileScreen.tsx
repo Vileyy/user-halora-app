@@ -55,13 +55,13 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
       const unsubscribe = onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
           const userData = snapshot.val();
-          console.log("ProfileScreen - User data loaded:", {
-            uid: userData.uid,
-            email: userData.email,
-            displayName: userData.displayName,
-            avatar: userData.avatar,
-            photoURL: userData.photoURL,
-          });
+          // console.log("ProfileScreen - User data loaded:", {
+          //   uid: userData.uid,
+          //   email: userData.email,
+          //   displayName: userData.displayName,
+          //   avatar: userData.avatar,
+          //   photoURL: userData.photoURL,
+          // });
           setUser(userData);
         } else {
           setUser(null);

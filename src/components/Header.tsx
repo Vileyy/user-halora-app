@@ -102,7 +102,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const handleMenuPress = () => {
     setIsMenuVisible(true);
-    console.log("Menu pressed");
+    // console.log("Menu pressed");
   };
 
   const handleSearchPress = () => {
@@ -153,7 +153,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <>
+    <View style={styles.headerContainer}>
       {/* Overlay to close dropdown when tapping outside */}
       {showSearchDropdown && (
         <TouchableOpacity
@@ -205,20 +205,24 @@ const Header: React.FC<HeaderProps> = ({
         <Ionicons name="cart-outline" size={24} color="black" />
         <CartBadge size="medium" />
       </TouchableOpacity> */}
-
-        {/* Search Dropdown */}
-        <SearchDropdown
-          searchText={search}
-          onProductSelect={handleProductSelect}
-          visible={showSearchDropdown}
-          onClose={handleCloseDropdown}
-        />
       </View>
-    </>
+
+      {/* Search Dropdown - Moved outside header for better positioning */}
+      <SearchDropdown
+        searchText={search}
+        onProductSelect={handleProductSelect}
+        visible={showSearchDropdown}
+        onClose={handleCloseDropdown}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  headerContainer: {
+    position: "relative",
+    zIndex: 1000,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",

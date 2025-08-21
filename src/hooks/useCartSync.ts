@@ -42,11 +42,11 @@ export const useCartSync = () => {
         // console.log("📦 Firebase cart data:", data);
 
         if (data && Array.isArray(data) && data.length > 0) {
-          console.log("✅ Loading existing cart items:", data);
+          // console.log("✅ Loading existing cart items:", data);
           dispatch(setCartItems(data));
           dispatch(initializeSelected());
         } else {
-          console.log("📭 No cart data found, keeping current cart");
+          // console.log("📭 No cart data found, keeping current cart");
           dispatch(initializeSelected());
         }
 
@@ -71,7 +71,7 @@ export const useCartSync = () => {
     const cartRef = ref(database, `users/${user.uid}/cart`);
     set(cartRef, cartItems)
       .then(() => {
-        console.log("✅ Successfully synced to Firebase");
+        // console.log("✅ Successfully synced to Firebase");
       })
       .catch((error) => {
         console.error("❌ Error syncing cart to Firebase:", error);
@@ -80,7 +80,7 @@ export const useCartSync = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log("🚪 User logged out, resetting sync state");
+      // console.log("🚪 User logged out, resetting sync state");
       isLoaded.current = false;
       shouldSync.current = false;
     }

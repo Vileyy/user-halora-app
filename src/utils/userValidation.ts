@@ -44,16 +44,16 @@ export const validateUserForOrder = (
   const hasValidName = hasDisplayName || hasName;
 
   // Debug log để kiểm tra tên
-  console.log("Name validation debug:", {
-    provider: user.provider,
-    isGoogleUser,
-    displayName: user.displayName,
-    name: user.name,
-    hasDisplayName,
-    hasName,
-    hasValidName,
-    willSkipNameCheck: isGoogleUser && hasDisplayName,
-  });
+  // console.log("Name validation debug:", {
+  //   provider: user.provider,
+  //   isGoogleUser,
+  //   displayName: user.displayName,
+  //   name: user.name,
+  //   hasDisplayName,
+  //   hasName,
+  //   hasValidName,
+  //   willSkipNameCheck: isGoogleUser && hasDisplayName,
+  // });
 
   // Nếu là Google user và đã có displayName thì bỏ qua check tên
   if (!isGoogleUser && !hasValidName) {
@@ -84,13 +84,13 @@ export const validateUserForOrder = (
       user.addressData.detailAddress.trim().length > 0);
 
   // Debug log để kiểm tra
-  console.log("Address validation debug:", {
-    address: user.address,
-    addressLength: user.address?.length,
-    addressData: user.addressData,
-    hasAddress,
-    finalValidation: hasAddress,
-  });
+  // console.log("Address validation debug:", {
+  //   address: user.address,
+  //   addressLength: user.address?.length,
+  //   addressData: user.addressData,
+  //   hasAddress,
+  //   finalValidation: hasAddress,
+  // });
 
   if (!hasAddress) {
     missingFields.push("address");

@@ -52,7 +52,7 @@ const NewProducts: React.FC = () => {
     <TouchableOpacity
       style={styles.productContainer}
       onPress={() => {
-        console.log("Product pressed:", item);
+        // console.log("Product pressed:", item);
         (navigation as any).navigate("ProductDetailScreen", { product: item });
       }}
     >

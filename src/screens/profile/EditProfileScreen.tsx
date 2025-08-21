@@ -94,15 +94,15 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
       onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
           const userData = snapshot.val();
-          console.log("EditProfileScreen - User data loaded:", {
-            uid: userData.uid,
-            email: userData.email,
-            displayName: userData.displayName,
-            avatar: userData.avatar,
-            photoURL: userData.photoURL,
-            address: userData.address,
-            addressData: userData.addressData,
-          });
+          // console.log("EditProfileScreen - User data loaded:", {
+          //   uid: userData.uid,
+          //   email: userData.email,
+          //   displayName: userData.displayName,
+          //   avatar: userData.avatar,
+          //   photoURL: userData.photoURL,
+          //   address: userData.address,
+          //   addressData: userData.addressData,
+          // });
           setUser(userData);
           // Cập nhật Redux state cũng
           dispatch(setUserAction(userData));

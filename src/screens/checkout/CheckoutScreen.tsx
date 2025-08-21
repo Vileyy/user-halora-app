@@ -202,8 +202,6 @@ export default function CheckoutScreen() {
                   "Đơn hàng đã được tạo thành công nhưng có lỗi khi cập nhật giỏ hàng. Vui lòng kiểm tra lại giỏ hàng."
                 );
               }
-
-              // Navigate đến OrderSuccessScreen
               (navigation as any).navigate("OrderSuccessScreen", {
                 orderId,
                 totalAmount: finalTotal,

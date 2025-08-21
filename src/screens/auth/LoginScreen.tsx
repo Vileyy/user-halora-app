@@ -252,6 +252,8 @@ export default function LoginScreen() {
 
         if (!snapshot.exists()) {
           await set(userRef, userData);
+          // Lưu thông tin user mới vào Redux state
+          dispatch(setUser(userData));
         } else {
           const existingData = snapshot.val();
           const updatedData = {
@@ -266,14 +268,9 @@ export default function LoginScreen() {
           };
           await set(userRef, updatedData);
 
-          // Cập nhật userData với thông tin từ existing data
-          userData.avatar = updatedData.avatar;
-          userData.phone = existingData.phone || "";
-          userData.createdAt = existingData.createdAt;
+          // Lưu thông tin đầy đủ từ database vào Redux state (bao gồm cả địa chỉ)
+          dispatch(setUser(updatedData));
         }
-
-        // Lưu thông tin user vào Redux state
-        dispatch(setUser(userData));
 
         dispatch(setGoogleSigningIn(false));
 
