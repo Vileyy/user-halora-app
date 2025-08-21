@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { getAuth } from "firebase/auth";
 import { getDatabase, ref, update, onValue } from "firebase/database";
 import * as ImagePicker from "expo-image-picker";
+import { useDispatch } from "react-redux";
+import { setUser as setUserAction } from "../../redux/slices/authSlice";
 import AddressSelector from "../../components/AddressSelector";
 import { AddressData } from "../../services/addressService";
 import cloudinaryService from "../../services/cloudinaryService";
@@ -34,8 +36,9 @@ interface User {
   displayName?: string;
   name?: string;
   avatar?: string;
-  address?: string; 
-  addressData?: AddressData; 
+  photoURL?: string;
+  address?: string;
+  addressData?: AddressData;
   dateOfBirth?: string;
   gender?: string;
 }
@@ -45,6 +48,7 @@ interface EditProfileScreenProps {
 }
 
 const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
+  const dispatch = useDispatch();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,7 +94,18 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
       onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
           const userData = snapshot.val();
+          console.log("EditProfileScreen - User data loaded:", {
+            uid: userData.uid,
+            email: userData.email,
+            displayName: userData.displayName,
+            avatar: userData.avatar,
+            photoURL: userData.photoURL,
+            address: userData.address,
+            addressData: userData.addressData,
+          });
           setUser(userData);
+          // Cập nhật Redux state cũng
+          dispatch(setUserAction(userData));
           let parsedDate = new Date();
           if (userData.dateOfBirth) {
             const dateParts = userData.dateOfBirth.split("/");
@@ -369,8 +384,11 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
             onPress={handleImagePicker}
             disabled={uploadingImage}
           >
-            {user?.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            {user?.avatar || user?.photoURL ? (
+              <Image
+                source={{ uri: user.avatar || user.photoURL }}
+                style={styles.avatar}
+              />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>{getAvatarInitials()}</Text>

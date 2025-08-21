@@ -23,7 +23,13 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { useAuth } from "../../hooks/useAuth";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
+import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
 import { useCartSync } from "../../hooks/useCartSync";
+import {
+  validateUserForOrder,
+  createValidationMessage,
+  ValidationResult,
+} from "../../utils/userValidation";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -35,14 +41,21 @@ export default function ProductDetailScreen() {
   const { product } = route.params;
 
   if (!product) {
-    return null; 
+    return null;
   }
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const user = useSelector((state: RootState) => state.auth.user);
   const { addItemToCart } = useCartSync();
   const { isAuthenticated } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult>({
+    isValid: true,
+    missingFields: [],
+    messages: [],
+  });
 
   const totalCartItems = cartItems.reduce(
     (sum, item) => sum + item.quantity,
@@ -128,6 +141,15 @@ export default function ProductDetailScreen() {
       setShowAuthModal(true);
       return;
     }
+
+    // Kiểm tra thông tin người dùng
+    const validation = validateUserForOrder(user);
+    if (!validation.isValid) {
+      setValidationResult(validation);
+      setShowUserInfoModal(true);
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     addItemToCart({
       id: product.id,
@@ -146,8 +168,23 @@ export default function ProductDetailScreen() {
       visibilityTime: 2000,
       topOffset: 60,
       onHide: () => {
-        // TODO: Navigate to checkout screen
-        console.log("Navigate to checkout");
+        // Navigate to checkout screen with current item
+        navigation.navigate("CheckoutScreen", {
+          selectedItems: [
+            {
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              description: product.description,
+              image: product.image,
+              category: product.category,
+              quantity: quantity,
+              selected: true,
+            },
+          ],
+          totalPrice:
+            parseInt(product.price.toString().replace(/[^\d]/g, "")) * quantity,
+        });
       },
     });
   };
@@ -412,6 +449,14 @@ export default function ProductDetailScreen() {
         onClose={() => setShowAuthModal(false)}
         title="Đăng nhập cần thiết"
         message="Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng"
+      />
+
+      <UserInfoRequiredModal
+        visible={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        onNavigateToProfile={() => navigation.navigate("EditProfileScreen")}
+        missingFields={validationResult.missingFields}
+        message={createValidationMessage(validationResult)}
       />
     </View>
   );

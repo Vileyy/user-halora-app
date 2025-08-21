@@ -26,6 +26,12 @@ import {
   removeItemsFromUserCart,
   getUserOrdersDebug,
 } from "../../services/orderService";
+import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
+import {
+  validateUserForOrder,
+  createValidationMessage,
+  ValidationResult,
+} from "../../utils/userValidation";
 
 type CheckoutScreenRouteProp = RouteProp<RootStackParamList, "CheckoutScreen">;
 type CheckoutScreenNavigationProp = StackNavigationProp<
@@ -55,6 +61,12 @@ export default function CheckoutScreen() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult>({
+    isValid: true,
+    missingFields: [],
+    messages: [],
+  });
   const { selectedItems, totalPrice } = route.params as {
     selectedItems: CartItem[];
     totalPrice: number;
@@ -116,6 +128,14 @@ export default function CheckoutScreen() {
   const handlePlaceOrder = () => {
     if (!user) {
       Alert.alert("Lỗi", "Vui lòng đăng nhập để đặt hàng");
+      return;
+    }
+
+    // Kiểm tra thông tin người dùng
+    const validation = validateUserForOrder(user);
+    if (!validation.isValid) {
+      setValidationResult(validation);
+      setShowUserInfoModal(true);
       return;
     }
 
@@ -495,6 +515,15 @@ export default function CheckoutScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* Modals */}
+      <UserInfoRequiredModal
+        visible={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        onNavigateToProfile={() => navigation.navigate("EditProfileScreen")}
+        missingFields={validationResult.missingFields}
+        message={createValidationMessage(validationResult)}
+      />
     </SafeAreaView>
   );
 }

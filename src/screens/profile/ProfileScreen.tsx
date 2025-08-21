@@ -27,6 +27,7 @@ interface User {
   displayName?: string;
   name?: string;
   avatar?: string;
+  photoURL?: string;
 }
 
 interface ProfileScreenProps {
@@ -54,6 +55,13 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
       const unsubscribe = onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
           const userData = snapshot.val();
+          console.log("ProfileScreen - User data loaded:", {
+            uid: userData.uid,
+            email: userData.email,
+            displayName: userData.displayName,
+            avatar: userData.avatar,
+            photoURL: userData.photoURL,
+          });
           setUser(userData);
         } else {
           setUser(null);
@@ -246,8 +254,11 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         {/* User Info Card */}
         <View style={styles.userCard}>
           <View style={styles.avatarContainer}>
-            {user?.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            {user?.avatar || user?.photoURL ? (
+              <Image
+                source={{ uri: user.avatar || user.photoURL }}
+                style={styles.avatar}
+              />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>{getAvatarInitials()}</Text>

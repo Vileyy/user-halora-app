@@ -10,6 +10,9 @@ import {
   Animated,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch } from "react-redux";
@@ -49,6 +52,13 @@ export default function RegisterScreen() {
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
+
+  // Refs for scroll and inputs
+  const scrollViewRef = useRef<ScrollView>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
 
   // Animated values
   const emailLabelAnim = useRef(new Animated.Value(0)).current;
@@ -130,6 +140,27 @@ export default function RegisterScreen() {
     }).start();
   }, [confirmPasswordFocused]);
 
+  // Auto scroll when input is focused
+  const handleInputFocus = (inputPosition: number) => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: inputPosition,
+        animated: true,
+      });
+    }, 100);
+  };
+
+  // Handle next field navigation
+  const handleSubmitEditing = (
+    nextInputRef?: React.RefObject<TextInput | null>
+  ) => {
+    if (nextInputRef?.current) {
+      nextInputRef.current.focus();
+    } else {
+      Keyboard.dismiss();
+    }
+  };
+
   const handleRegister = async () => {
     // Validation
     if (!email.includes("@")) {
@@ -198,13 +229,9 @@ export default function RegisterScreen() {
 
       // Lưu vào nhánh "users" với UID làm key
       await set(ref(database, `users/${userCredential.user.uid}`), userData);
-      console.log("Đã lưu thông tin user vào database");
-
-      // Delay 1 giây để hiển thị loading
+      // console.log("Đã lưu thông tin user vào database");
       setTimeout(() => {
         setIsLoading(false);
-
-        // Hiển thị thông báo thành công
         Toast.show({
           type: "success",
           text1: "Đăng ký thành công!",
@@ -212,8 +239,6 @@ export default function RegisterScreen() {
           position: "top",
           visibilityTime: 3000,
         });
-
-        // Chuyển về trang Login sau 2 giây
         setTimeout(() => {
           navigation.navigate("LoginScreen");
         }, 2000);
@@ -236,270 +261,311 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FF99CC" />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      <SafeAreaView style={styles.flex}>
+        <StatusBar barStyle="light-content" backgroundColor="#FF99CC" />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Logo Section */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("../../assets/image/Logo_Halora.png")}
-            style={styles.logoImage}
-          />
-        </View>
-
-        {/* Form Section */}
-        <View style={styles.formContainer}>
-          <Text style={styles.registerTitle}>Register Halora Comestic</Text>
-
-          <View style={styles.inputContainer}>
-            {/* Email Input */}
-            <View style={styles.inputWrapper}>
-              <Animated.View
-                style={[
-                  styles.labelContainer,
-                  {
-                    opacity: emailLabelAnim,
-                    transform: [
-                      {
-                        translateY: emailLabelAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.inputLabel}>Email</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: emailBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["#E0E0E0", "#FF99CC"],
-                    }),
-                    borderWidth: emailBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2],
-                    }),
-                  },
-                ]}
-              >
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor="#999"
-                  value={email}
-                  onChangeText={(text) => dispatch(setEmail(text))}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  onFocus={() => setEmailFocused(true)}
-                  onBlur={() => setEmailFocused(false)}
-                />
-              </Animated.View>
-            </View>
-
-            {/* Phone Input */}
-            <View style={styles.inputWrapper}>
-              <Animated.View
-                style={[
-                  styles.labelContainer,
-                  {
-                    opacity: phoneLabelAnim,
-                    transform: [
-                      {
-                        translateY: phoneLabelAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.inputLabel}>Số điện thoại</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: phoneBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["#E0E0E0", "#FF99CC"],
-                    }),
-                    borderWidth: phoneBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2],
-                    }),
-                  },
-                ]}
-              >
-                <TextInput
-                  style={styles.input}
-                  placeholder="Số điện thoại"
-                  placeholderTextColor="#999"
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  onFocus={() => setPhoneFocused(true)}
-                  onBlur={() => setPhoneFocused(false)}
-                />
-              </Animated.View>
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.inputWrapper}>
-              <Animated.View
-                style={[
-                  styles.labelContainer,
-                  {
-                    opacity: passwordLabelAnim,
-                    transform: [
-                      {
-                        translateY: passwordLabelAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.inputLabel}>Mật khẩu</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: passwordBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["#E0E0E0", "#FF99CC"],
-                    }),
-                    borderWidth: passwordBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2],
-                    }),
-                  },
-                ]}
-              >
-                <View style={styles.passwordInputContainer}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Mật khẩu"
-                    placeholderTextColor="#999"
-                    value={password}
-                    onChangeText={(text) => dispatch(setPassword(text))}
-                    secureTextEntry={!showPassword}
-                    onFocus={() => setPasswordFocused(true)}
-                    onBlur={() => setPasswordFocused(false)}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeIcon}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Text style={styles.eyeIconText}>
-                      {showPassword ? "👁️" : "👁️‍🗨️"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
-
-            {/* Confirm Password Input */}
-            <View style={styles.inputWrapper}>
-              <Animated.View
-                style={[
-                  styles.labelContainer,
-                  {
-                    opacity: confirmPasswordLabelAnim,
-                    transform: [
-                      {
-                        translateY: confirmPasswordLabelAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.inputLabel}>Xác nhận mật khẩu</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: confirmPasswordBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["#E0E0E0", "#FF99CC"],
-                    }),
-                    borderWidth: confirmPasswordBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2],
-                    }),
-                  },
-                ]}
-              >
-                <View style={styles.passwordInputContainer}>
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Xác nhận mật khẩu"
-                    placeholderTextColor="#999"
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    secureTextEntry={!showConfirmPassword}
-                    onFocus={() => setConfirmPasswordFocused(true)}
-                    onBlur={() => setConfirmPasswordFocused(false)}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeIcon}
-                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    <Text style={styles.eyeIconText}>
-                      {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Logo Section */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../../assets/image/halora-icon.png")}
+              style={styles.logoImage}
+            />
           </View>
 
-          {/* Register Button */}
-          <TouchableOpacity
-            style={[
-              styles.registerButton,
-              isLoading && styles.registerButtonDisabled,
-            ]}
-            onPress={handleRegister}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.registerButtonText}>Đăng ký</Text>
-            )}
-          </TouchableOpacity>
+          {/* Form Section */}
+          <View style={styles.formContainer}>
+            <Text style={styles.registerTitle}>Register Halora Comestic</Text>
 
-          {/* Login Link */}
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Đã có tài khoản? </Text>
+            <View style={styles.inputContainer}>
+              {/* Email Input */}
+              <View style={styles.inputWrapper}>
+                <Animated.View
+                  style={[
+                    styles.labelContainer,
+                    {
+                      opacity: emailLabelAnim,
+                      transform: [
+                        {
+                          translateY: emailLabelAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Email</Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: emailBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["#E0E0E0", "#FF99CC"],
+                      }),
+                      borderWidth: emailBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 2],
+                      }),
+                    },
+                  ]}
+                >
+                  <TextInput
+                    ref={emailInputRef}
+                    style={styles.input}
+                    placeholder="Email"
+                    placeholderTextColor="#999"
+                    value={email}
+                    onChangeText={(text) => dispatch(setEmail(text))}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    onFocus={() => {
+                      setEmailFocused(true);
+                      handleInputFocus(150);
+                    }}
+                    onBlur={() => setEmailFocused(false)}
+                    onSubmitEditing={() => handleSubmitEditing(phoneInputRef)}
+                    blurOnSubmit={false}
+                  />
+                </Animated.View>
+              </View>
+
+              {/* Phone Input */}
+              <View style={styles.inputWrapper}>
+                <Animated.View
+                  style={[
+                    styles.labelContainer,
+                    {
+                      opacity: phoneLabelAnim,
+                      transform: [
+                        {
+                          translateY: phoneLabelAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Số điện thoại</Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: phoneBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["#E0E0E0", "#FF99CC"],
+                      }),
+                      borderWidth: phoneBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 2],
+                      }),
+                    },
+                  ]}
+                >
+                  <TextInput
+                    ref={phoneInputRef}
+                    style={styles.input}
+                    placeholder="Số điện thoại"
+                    placeholderTextColor="#999"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    returnKeyType="next"
+                    onFocus={() => {
+                      setPhoneFocused(true);
+                      handleInputFocus(250);
+                    }}
+                    onBlur={() => setPhoneFocused(false)}
+                    onSubmitEditing={() =>
+                      handleSubmitEditing(passwordInputRef)
+                    }
+                    blurOnSubmit={false}
+                  />
+                </Animated.View>
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputWrapper}>
+                <Animated.View
+                  style={[
+                    styles.labelContainer,
+                    {
+                      opacity: passwordLabelAnim,
+                      transform: [
+                        {
+                          translateY: passwordLabelAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Mật khẩu</Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: passwordBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["#E0E0E0", "#FF99CC"],
+                      }),
+                      borderWidth: passwordBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 2],
+                      }),
+                    },
+                  ]}
+                >
+                  <View style={styles.passwordInputContainer}>
+                    <TextInput
+                      ref={passwordInputRef}
+                      style={styles.passwordInput}
+                      placeholder="Mật khẩu"
+                      placeholderTextColor="#999"
+                      value={password}
+                      onChangeText={(text) => dispatch(setPassword(text))}
+                      secureTextEntry={!showPassword}
+                      returnKeyType="next"
+                      onFocus={() => {
+                        setPasswordFocused(true);
+                        handleInputFocus(350);
+                      }}
+                      onBlur={() => setPasswordFocused(false)}
+                      onSubmitEditing={() =>
+                        handleSubmitEditing(confirmPasswordInputRef)
+                      }
+                      blurOnSubmit={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeIcon}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Text style={styles.eyeIconText}>
+                        {showPassword ? "👁️" : "👁️‍🗨️"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </View>
+
+              {/* Confirm Password Input */}
+              <View style={styles.inputWrapper}>
+                <Animated.View
+                  style={[
+                    styles.labelContainer,
+                    {
+                      opacity: confirmPasswordLabelAnim,
+                      transform: [
+                        {
+                          translateY: confirmPasswordLabelAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Xác nhận mật khẩu</Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: confirmPasswordBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["#E0E0E0", "#FF99CC"],
+                      }),
+                      borderWidth: confirmPasswordBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 2],
+                      }),
+                    },
+                  ]}
+                >
+                  <View style={styles.passwordInputContainer}>
+                    <TextInput
+                      ref={confirmPasswordInputRef}
+                      style={styles.passwordInput}
+                      placeholder="Xác nhận mật khẩu"
+                      placeholderTextColor="#999"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry={!showConfirmPassword}
+                      returnKeyType="done"
+                      onFocus={() => {
+                        setConfirmPasswordFocused(true);
+                        handleInputFocus(450);
+                      }}
+                      onBlur={() => setConfirmPasswordFocused(false)}
+                      onSubmitEditing={() => handleSubmitEditing()}
+                      blurOnSubmit={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeIcon}
+                      onPress={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                    >
+                      <Text style={styles.eyeIconText}>
+                        {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </View>
+            </View>
+
+            {/* Register Button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate("LoginScreen")}
+              style={[
+                styles.registerButton,
+                isLoading && styles.registerButtonDisabled,
+              ]}
+              onPress={handleRegister}
+              disabled={isLoading}
             >
-              <Text style={styles.loginLink}>Đăng nhập ngay</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.registerButtonText}>Đăng ký</Text>
+              )}
             </TouchableOpacity>
+
+            {/* Login Link */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Đã có tài khoản? </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("LoginScreen")}
+              >
+                <Text style={styles.loginLink}>Đăng nhập ngay</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -508,6 +574,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FF99CC",
   },
+  flex: {
+    flex: 1,
+  },
   logoContainer: {
     flex: 1,
     justifyContent: "center",
@@ -515,8 +584,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 250,
+    height: 250,
   },
   formContainer: {
     backgroundColor: "#fff",

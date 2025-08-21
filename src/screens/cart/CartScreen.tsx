@@ -22,6 +22,12 @@ import * as Haptics from "expo-haptics";
 import { RootStackParamList } from "../../types/navigation";
 import { useAuth } from "../../hooks/useAuth";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
+import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
+import {
+  validateUserForOrder,
+  createValidationMessage,
+  ValidationResult,
+} from "../../utils/userValidation";
 
 type CartScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -31,8 +37,16 @@ type CartScreenNavigationProp = StackNavigationProp<
 export default function CartScreen() {
   const navigation = useNavigation<CartScreenNavigationProp>();
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const user = useSelector((state: RootState) => state.auth.user);
   const { isAuthenticated } = useAuth();
   const [showAuthModal, setShowAuthModal] = React.useState(false);
+  const [showUserInfoModal, setShowUserInfoModal] = React.useState(false);
+  const [validationResult, setValidationResult] =
+    React.useState<ValidationResult>({
+      isValid: true,
+      missingFields: [],
+      messages: [],
+    });
   const {
     removeItemFromCart,
     updateItemQuantity,
@@ -144,6 +158,21 @@ export default function CartScreen() {
       );
       return;
     }
+
+    // Kiểm tra đăng nhập
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // Kiểm tra thông tin người dùng
+    const validation = validateUserForOrder(user);
+    if (!validation.isValid) {
+      setValidationResult(validation);
+      setShowUserInfoModal(true);
+      return;
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     navigation.navigate("CheckoutScreen", {
       selectedItems: selectedItems,
@@ -404,6 +433,15 @@ export default function CartScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Modals */}
+      <UserInfoRequiredModal
+        visible={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        onNavigateToProfile={() => navigation.navigate("EditProfileScreen")}
+        missingFields={validationResult.missingFields}
+        message={createValidationMessage(validationResult)}
+      />
     </SafeAreaView>
   );
 }

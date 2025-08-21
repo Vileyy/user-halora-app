@@ -9,6 +9,13 @@ interface UserData {
   displayName?: string;
   photoURL?: string;
   provider?: string;
+  address?: string;
+  addressData?: {
+    province: any;
+    district: any;
+    ward: any;
+    detailAddress: string;
+  };
 }
 
 interface AuthState {

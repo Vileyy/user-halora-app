@@ -10,6 +10,9 @@ import {
   Animated,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 // @ts-ignore
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -59,6 +62,11 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Refs for scroll and inputs
+  const scrollViewRef = useRef<ScrollView>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+
   // Animated values
   const emailLabelAnim = useRef(new Animated.Value(0)).current;
   const passwordLabelAnim = useRef(new Animated.Value(0)).current;
@@ -70,7 +78,7 @@ export default function LoginScreen() {
     GoogleSignin.configure({
       webClientId:
         "1029103419885-dv28mm1cepi33c4vgpabfn2s0o1sbb7v.apps.googleusercontent.com",
-      forceCodeForRefreshToken: true, 
+      forceCodeForRefreshToken: true,
     });
   }, []);
 
@@ -109,6 +117,27 @@ export default function LoginScreen() {
       useNativeDriver: false,
     }).start();
   }, [passwordFocused]);
+
+  // Auto scroll when input is focused
+  const handleInputFocus = (inputPosition: number) => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: inputPosition,
+        animated: true,
+      });
+    }, 100);
+  };
+
+  // Handle next field navigation
+  const handleSubmitEditing = (
+    nextInputRef?: React.RefObject<TextInput | null>
+  ) => {
+    if (nextInputRef?.current) {
+      nextInputRef.current.focus();
+    } else {
+      Keyboard.dismiss();
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.includes("@")) {
@@ -195,21 +224,21 @@ export default function LoginScreen() {
       await GoogleSignin.hasPlayServices();
 
       const userInfo = await GoogleSignin.signIn({
-        loginHint: "", 
+        loginHint: "",
       });
 
       if (userInfo.data?.idToken) {
         const credential = GoogleAuthProvider.credential(userInfo.data.idToken);
         const userCredential = await signInWithCredential(auth, credential);
         const firebaseUser = userCredential.user;
+        // console.log("✅ Login thành công:", firebaseUser);
 
-        console.log("✅ Login thành công:", firebaseUser);
-
-        // Chuẩn bị dữ liệu user
+        // datadata user
         const userData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
           displayName: firebaseUser.displayName || "",
+          avatar: firebaseUser.photoURL || "",
           photoURL: firebaseUser.photoURL || "",
           provider: "google",
           phone: "",
@@ -217,7 +246,7 @@ export default function LoginScreen() {
           updatedAt: new Date().toISOString(),
         };
 
-        // Kiểm tra xem user đã tồn tại trong database 
+        // Kiểm tra xem user đã tồn tại trong database
         const userRef = ref(database, `users/${firebaseUser.uid}`);
         const snapshot = await get(userRef);
 
@@ -228,10 +257,17 @@ export default function LoginScreen() {
           const updatedData = {
             ...existingData,
             displayName: firebaseUser.displayName || existingData.displayName,
+            avatar:
+              firebaseUser.photoURL ||
+              existingData.avatar ||
+              existingData.photoURL,
             photoURL: firebaseUser.photoURL || existingData.photoURL,
             updatedAt: new Date().toISOString(),
           };
           await set(userRef, updatedData);
+
+          // Cập nhật userData với thông tin từ existing data
+          userData.avatar = updatedData.avatar;
           userData.phone = existingData.phone || "";
           userData.createdAt = existingData.createdAt;
         }
@@ -268,204 +304,227 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FF99CC" />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      <SafeAreaView style={styles.flex}>
+        <StatusBar barStyle="light-content" backgroundColor="#FF99CC" />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Logo Section */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("../../assets/image/Logo_Halora.png")}
-            style={styles.logoImage}
-          />
-        </View>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Logo Section */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../../assets/image/halora-icon.png")}
+              style={styles.logoImage}
+            />
+          </View>
 
-        {/* Form Section */}
-        <View style={styles.formContainer}>
-          <Text style={styles.loginTitle}>Login Halora Comestic</Text>
+          {/* Form Section */}
+          <View style={styles.formContainer}>
+            <Text style={styles.loginTitle}>Login Halora Cosmetic</Text>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Animated.View
-                style={[
-                  styles.labelContainer,
-                  {
-                    opacity: emailLabelAnim,
-                    transform: [
-                      {
-                        translateY: emailLabelAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.inputLabel}>Email</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: emailBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["#E0E0E0", "#FF99CC"],
-                    }),
-                    borderWidth: emailBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2],
-                    }),
-                  },
-                ]}
-              >
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor="#999"
-                  value={email}
-                  onChangeText={(text) => dispatch(setEmail(text))}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  onFocus={() => setEmailFocused(true)}
-                  onBlur={() => setEmailFocused(false)}
-                />
-              </Animated.View>
-            </View>
-
-            <View style={styles.inputWrapper}>
-              <Animated.View
-                style={[
-                  styles.labelContainer,
-                  {
-                    opacity: passwordLabelAnim,
-                    transform: [
-                      {
-                        translateY: passwordLabelAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.inputLabel}>Mật khẩu</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: passwordBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["#E0E0E0", "#FF99CC"],
-                    }),
-                    borderWidth: passwordBorderAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2],
-                    }),
-                  },
-                ]}
-              >
-                <View style={styles.passwordInputContainer}>
+            <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
+                <Animated.View
+                  style={[
+                    styles.labelContainer,
+                    {
+                      opacity: emailLabelAnim,
+                      transform: [
+                        {
+                          translateY: emailLabelAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Email</Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: emailBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["#E0E0E0", "#FF99CC"],
+                      }),
+                      borderWidth: emailBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 2],
+                      }),
+                    },
+                  ]}
+                >
                   <TextInput
-                    style={styles.passwordInput}
-                    placeholder="Mật khẩu"
+                    ref={emailInputRef}
+                    style={styles.input}
+                    placeholder="Email"
                     placeholderTextColor="#999"
-                    value={password}
-                    onChangeText={(text) => dispatch(setPassword(text))}
-                    secureTextEntry={!showPassword}
-                    onFocus={() => setPasswordFocused(true)}
-                    onBlur={() => setPasswordFocused(false)}
+                    value={email}
+                    onChangeText={(text) => dispatch(setEmail(text))}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    onFocus={() => {
+                      setEmailFocused(true);
+                      handleInputFocus(200);
+                    }}
+                    onBlur={() => setEmailFocused(false)}
+                    onSubmitEditing={() =>
+                      handleSubmitEditing(passwordInputRef)
+                    }
+                    blurOnSubmit={false}
                   />
-                  <TouchableOpacity
-                    style={styles.eyeIcon}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Text style={styles.eyeIconText}>
-                      {showPassword ? "👁️" : "👁️‍🗨️"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
+                </Animated.View>
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Animated.View
+                  style={[
+                    styles.labelContainer,
+                    {
+                      opacity: passwordLabelAnim,
+                      transform: [
+                        {
+                          translateY: passwordLabelAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [20, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.inputLabel}>Mật khẩu</Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: passwordBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ["#E0E0E0", "#FF99CC"],
+                      }),
+                      borderWidth: passwordBorderAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 2],
+                      }),
+                    },
+                  ]}
+                >
+                  <View style={styles.passwordInputContainer}>
+                    <TextInput
+                      ref={passwordInputRef}
+                      style={styles.passwordInput}
+                      placeholder="Mật khẩu"
+                      placeholderTextColor="#999"
+                      value={password}
+                      onChangeText={(text) => dispatch(setPassword(text))}
+                      secureTextEntry={!showPassword}
+                      returnKeyType="done"
+                      onFocus={() => {
+                        setPasswordFocused(true);
+                        handleInputFocus(350);
+                      }}
+                      onBlur={() => setPasswordFocused(false)}
+                      onSubmitEditing={() => handleSubmitEditing()}
+                      blurOnSubmit={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeIcon}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Text style={styles.eyeIconText}>
+                        {showPassword ? "👁️" : "👁️‍🗨️"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </View>
+
+              <TouchableOpacity style={styles.forgotPassword}>
+                <Text style={styles.forgotPasswordText}>Forgot password ?</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot password ?</Text>
-            </TouchableOpacity>
-          </View>
+            {/* Social Login */}
+            <View style={styles.socialContainer}>
+              <View style={styles.orDivider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.orText}>Hoặc</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-          {/* Social Login */}
-          <View style={styles.socialContainer}>
-            <View style={styles.orDivider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.orText}>Hoặc</Text>
-              <View style={styles.dividerLine} />
+              <View style={styles.socialButtons}>
+                <TouchableOpacity
+                  style={[styles.socialButton, styles.googleButton]}
+                  activeOpacity={0.8}
+                  onPress={handleGoogleSignIn}
+                  disabled={isGoogleSigningIn}
+                >
+                  {isGoogleSigningIn ? (
+                    <ActivityIndicator color="#DB4437" size="small" />
+                  ) : (
+                    <Icon name="google" size={24} color="#DB4437" />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.socialButton, styles.facebookButton]}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="facebook" size={24} color="#4267B2" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.socialButton, styles.appleButton]}
+                  activeOpacity={0.8}
+                >
+                  <AntDesign name="apple1" size={24} color="#000" />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <View style={styles.socialButtons}>
-              <TouchableOpacity
-                style={[styles.socialButton, styles.googleButton]}
-                activeOpacity={0.8}
-                onPress={handleGoogleSignIn}
-                disabled={isGoogleSigningIn}
-              >
-                {isGoogleSigningIn ? (
-                  <ActivityIndicator color="#DB4437" size="small" />
-                ) : (
-                  <Icon name="google" size={24} color="#DB4437" />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.socialButton, styles.facebookButton]}
-                activeOpacity={0.8}
-              >
-                <Icon name="facebook" size={24} color="#4267B2" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.socialButton, styles.appleButton]}
-                activeOpacity={0.8}
-              >
-                <AntDesign name="apple1" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Login Button */}
-          <TouchableOpacity
-            style={[
-              styles.loginButton,
-              isLoading && styles.loginButtonDisabled,
-            ]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Register Link */}
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Chưa có tài khoản? </Text>
+            {/* Login Button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate("RegisterScreen")}
+              style={[
+                styles.loginButton,
+                isLoading && styles.loginButtonDisabled,
+              ]}
+              onPress={handleLogin}
+              disabled={isLoading}
             >
-              <Text style={styles.registerLink}>Đăng ký ngay</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+              )}
             </TouchableOpacity>
+
+            {/* Register Link */}
+            <View style={styles.registerContainer}>
+              <Text style={styles.registerText}>Chưa có tài khoản? </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("RegisterScreen")}
+              >
+                <Text style={styles.registerLink}>Đăng ký ngay</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -473,6 +532,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FF99CC",
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: 20,
@@ -521,8 +583,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 250,
+    height: 250,
   },
   logoIcon: {
     fontSize: 40,
