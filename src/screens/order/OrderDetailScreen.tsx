@@ -12,6 +12,7 @@ import {
   StatusBar,
   Dimensions,
   Animated,
+  Alert,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -549,9 +550,11 @@ export default function OrderDetailScreen() {
             <TouchableOpacity
               style={styles.reviewButton}
               onPress={() => {
-                // Navigate to review screen
-                // navigation.navigate("WriteReview", { orderId: order.id });
-                console.log("Navigate to review screen");
+                if (order.id) {
+                  navigation.navigate("MultiProductReviewScreen", {
+                    orderId: order.id,
+                  });
+                }
               }}
             >
               <Ionicons

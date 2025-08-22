@@ -44,6 +44,14 @@ export type RootStackParamList = {
     currentTotal?: number;
     onVoucherSelect?: (voucherCode: string) => void;
   };
+  ReviewScreen: {
+    orderId: string;
+    productId: string;
+  };
+  MultiProductReviewScreen: {
+    orderId: string;
+  };
+  ContactScreen: undefined;
 };
 
 export type TabParamList = {

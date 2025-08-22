@@ -222,10 +222,13 @@ export default function LoginScreen() {
 
       // Check service Google Play
       await GoogleSignin.hasPlayServices();
+      try {
+        await GoogleSignin.signOut();
+      } catch (signOutError) {
+        console.log("No existing Google session to sign out");
+      }
 
-      const userInfo = await GoogleSignin.signIn({
-        loginHint: "",
-      });
+      const userInfo = await GoogleSignin.signIn();
 
       if (userInfo.data?.idToken) {
         const credential = GoogleAuthProvider.credential(userInfo.data.idToken);

@@ -24,6 +24,7 @@ import { RootState } from "../../redux/reducers/rootReducer";
 import { useAuth } from "../../hooks/useAuth";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
 import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
+import ProductReviews from "../../components/ProductReviews";
 import { useCartSync } from "../../hooks/useCartSync";
 import {
   validateUserForOrder,
@@ -252,17 +253,6 @@ export default function ProductDetailScreen() {
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{product.name}</Text>
             <Text style={styles.productPrice}>{formattedPrice}</Text>
-
-            <View style={styles.ratingRow}>
-              <View style={styles.stars}>
-                {[1, 2, 3, 4].map((star) => (
-                  <Ionicons key={star} name="star" size={14} color="#FFB800" />
-                ))}
-                <Ionicons name="star-half" size={14} color="#FFB800" />
-              </View>
-              <Text style={styles.ratingText}>4.0</Text>
-              <Text style={styles.soldText}>Đã bán 128</Text>
-            </View>
           </View>
 
           {/* Delivery Info */}
@@ -307,6 +297,12 @@ export default function ProductDetailScreen() {
               <Text style={styles.specLabel}>Bảo hành</Text>
               <Text style={styles.specValue}>12 tháng</Text>
             </View>
+          </View>
+
+          {/* Detailed Reviews Section */}
+          <View style={styles.reviewsSection}>
+            <Text style={styles.sectionTitle}>Đánh giá và nhận xét</Text>
+            <ProductReviews productId={product.id} showAll={true} />
           </View>
         </View>
       </ScrollView>
@@ -667,6 +663,12 @@ const styles = StyleSheet.create({
   specsSection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  reviewsSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
   },
   sectionTitle: {
     fontSize: 16,

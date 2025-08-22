@@ -14,6 +14,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { getAuth, signOut } from "firebase/auth";
 import { getDatabase, ref, onValue, off } from "firebase/database";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import { useDispatch } from "react-redux";
+import { clearUser } from "../../redux/slices/authSlice";
+import { clearCart } from "../../redux/slices/cartSlice";
+import { clearFavorites } from "../../redux/slices/favoritesSlice";
 import { useAuth } from "../../hooks/useAuth";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
 
@@ -39,6 +44,7 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const auth = getAuth();
+  const dispatch = useDispatch();
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -117,13 +123,34 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         style: "destructive",
         onPress: async () => {
           try {
+            // Sign out from Firebase
             await signOut(auth);
+
+            // Sign out from Google
+            try {
+              await GoogleSignin.signOut();
+              console.log("✅ Google session cleared");
+            } catch (googleSignOutError) {
+              console.log(
+                "Google sign out error (can be ignored):",
+                googleSignOutError
+              );
+            }
+
+            // Clear Redux state
+            dispatch(clearUser());
+            dispatch(clearCart());
+            dispatch(clearFavorites());
+            console.log("✅ Redux state cleared");
+
+            // Clear AsyncStorage
             await AsyncStorage.multiRemove([
               "userToken",
               "userId",
               "userEmail",
               "isLoggedIn",
             ]);
+            console.log("✅ AsyncStorage cleared");
 
             // Navigate to login screen and reset navigation stack
             navigation.reset({

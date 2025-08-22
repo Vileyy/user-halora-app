@@ -143,6 +143,16 @@ export default function OrderStatusScreen() {
     }
   };
 
+  const handleReviewOrder = (order: Order) => {
+    if (order.id) {
+      navigation.navigate("MultiProductReviewScreen", { orderId: order.id });
+    }
+  };
+
+  const handleContactSupport = () => {
+    navigation.navigate("ContactScreen");
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -265,17 +275,27 @@ export default function OrderStatusScreen() {
 
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={styles.trackButton}
-                  onPress={() => handleTrackOrder(order)}
-                >
-                  <Ionicons
-                    name="paper-plane-outline"
-                    size={16}
-                    color="white"
-                  />
-                  <Text style={styles.trackButtonText}>Theo dõi</Text>
-                </TouchableOpacity>
+                {order.status === "delivered" ? (
+                  <TouchableOpacity
+                    style={styles.reviewButton}
+                    onPress={() => handleReviewOrder(order)}
+                  >
+                    <Ionicons name="star-outline" size={16} color="white" />
+                    <Text style={styles.reviewButtonText}>Đánh giá</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.contactButton}
+                    onPress={handleContactSupport}
+                  >
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={16}
+                      color="white"
+                    />
+                    <Text style={styles.contactButtonText}>Liên hệ</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={styles.detailButton}
                   onPress={() => handleOrderPress(order)}
@@ -484,6 +504,36 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   trackButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 4,
+  },
+  reviewButton: {
+    flex: 1,
+    backgroundColor: "#f39c12",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  reviewButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 4,
+  },
+  contactButton: {
+    flex: 1,
+    backgroundColor: "#9b59b6",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  contactButtonText: {
     color: "white",
     fontSize: 14,
     fontWeight: "600",

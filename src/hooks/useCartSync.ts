@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { ref, set, get, onValue, off } from "firebase/database";
 import { auth, database } from "../services/firebase";
 import { RootState } from "../redux/reducers/rootReducer";
+import { useAuth } from "./useAuth";
 import {
   addToCart,
   removeFromCart,
@@ -17,7 +18,6 @@ import {
   initializeSelected,
 } from "../redux/slices/cartSlice";
 import { CartItem } from "../redux/slices/cartSlice";
-import { useAuth } from "./useAuth";
 
 export const useCartSync = () => {
   const dispatch = useDispatch();

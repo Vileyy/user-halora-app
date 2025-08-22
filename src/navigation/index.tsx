@@ -17,6 +17,9 @@ import EditProfileScreen from "../screens/profile/EditProfileScreen";
 import ChangePasswordScreen from "../screens/profile/ChangePasswordScreen";
 import OrderHistoryScreen from "../screens/order/OrderHistoryScreen";
 import VoucherScreen from "../screens/voucher/VoucherScreen";
+import ReviewScreen from "../screens/review/ReviewScreen";
+import MultiProductReviewScreen from "../screens/review/MultiProductReviewScreen";
+import ContactScreen from "../screens/contact/ContactScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -102,6 +105,25 @@ export default function AppNavigator() {
         <Stack.Screen
           name="OrderHistoryScreen"
           component={OrderHistoryScreen}
+          options={{ headerShown: false }}
+        />
+
+        {/* Review */}
+        <Stack.Screen
+          name="ReviewScreen"
+          component={ReviewScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MultiProductReviewScreen"
+          component={MultiProductReviewScreen}
+          options={{ headerShown: false }}
+        />
+
+        {/* Contact */}
+        <Stack.Screen
+          name="ContactScreen"
+          component={ContactScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
