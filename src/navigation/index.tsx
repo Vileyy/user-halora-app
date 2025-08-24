@@ -20,6 +20,7 @@ import VoucherScreen from "../screens/voucher/VoucherScreen";
 import ReviewScreen from "../screens/review/ReviewScreen";
 import MultiProductReviewScreen from "../screens/review/MultiProductReviewScreen";
 import ContactScreen from "../screens/contact/ContactScreen";
+import ChatBotScreen from "../screens/ai/ChatBotScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -124,6 +125,13 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ContactScreen"
           component={ContactScreen}
+          options={{ headerShown: false }}
+        />
+
+        {/* AI Features */}
+        <Stack.Screen
+          name="ChatBotScreen"
+          component={ChatBotScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

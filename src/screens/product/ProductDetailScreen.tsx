@@ -14,7 +14,7 @@ import {
 import Toast from "react-native-toast-message";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,12 +25,15 @@ import { useAuth } from "../../hooks/useAuth";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
 import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
 import ProductReviews from "../../components/ProductReviews";
+import SmartRecommendations from "../../components/SmartRecommendations";
 import { useCartSync } from "../../hooks/useCartSync";
 import {
   validateUserForOrder,
   createValidationMessage,
   ValidationResult,
 } from "../../utils/userValidation";
+import { SmartRecommendationContext, UserProfile } from "../../types/ai";
+import { getDatabase, ref, onValue } from "firebase/database";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -66,6 +69,64 @@ export default function ProductDetailScreen() {
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [showQuantityModal, setShowQuantityModal] = useState<boolean>(false);
   const [tempQuantity, setTempQuantity] = useState<number>(1);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+
+  // AI Recommendation context
+  const [recommendationContext, setRecommendationContext] =
+    useState<SmartRecommendationContext>({
+      userId: user?.uid || "anonymous",
+      currentProduct: product,
+      recentlyViewed: [],
+      purchaseHistory: [],
+      searchHistory: [],
+      favorites: [],
+      cartItems: [],
+      sessionBehavior: {
+        timeSpent: {},
+        interactions: {},
+      },
+    });
+
+  useEffect(() => {
+    // Fetch all products for recommendations
+    const db = getDatabase();
+    const productsRef = ref(db, "products");
+
+    const unsubscribe = onValue(productsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const productsArray = Object.keys(data).map((key) => ({
+          id: key,
+          ...data[key],
+        }));
+        setAllProducts(productsArray);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Track product view time for AI recommendations
+    const startTime = Date.now();
+
+    return () => {
+      const timeSpent = Date.now() - startTime;
+      setRecommendationContext((prev) => ({
+        ...prev,
+        currentProduct: product,
+        recentlyViewed: [product.id, ...prev.recentlyViewed.slice(0, 9)],
+        sessionBehavior: {
+          ...prev.sessionBehavior,
+          timeSpent: {
+            ...prev.sessionBehavior.timeSpent,
+            [product.id]:
+              (prev.sessionBehavior.timeSpent[product.id] || 0) + timeSpent,
+          },
+        },
+      }));
+    };
+  }, [product.id]);
 
   const formattedPrice = useMemo(() => {
     const priceStr = product.price || "0";
@@ -297,6 +358,38 @@ export default function ProductDetailScreen() {
               <Text style={styles.specLabel}>Bảo hành</Text>
               <Text style={styles.specValue}>12 tháng</Text>
             </View>
+          </View>
+
+          {/* AI Smart Recommendations */}
+          <View style={styles.recommendationsSection}>
+            <SmartRecommendations
+              title="✨ Sản phẩm tương tự"
+              context={recommendationContext}
+              currentProducts={allProducts.filter((p) => p.id !== product.id)}
+              maxItems={4}
+              showReason={true}
+              onProductPress={(recommendedProduct) => {
+                // Track recommendation interaction
+                setRecommendationContext((prev) => ({
+                  ...prev,
+                  sessionBehavior: {
+                    ...prev.sessionBehavior,
+                    interactions: {
+                      ...prev.sessionBehavior.interactions,
+                      [recommendedProduct.id]:
+                        (prev.sessionBehavior.interactions[
+                          recommendedProduct.id
+                        ] || 0) + 1,
+                    },
+                  },
+                }));
+
+                // Navigate to the recommended product
+                navigation.navigate("ProductDetailScreen", {
+                  product: recommendedProduct,
+                });
+              }}
+            />
           </View>
 
           {/* Detailed Reviews Section */}
@@ -663,6 +756,11 @@ const styles = StyleSheet.create({
   specsSection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  recommendationsSection: {
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
   },
   reviewsSection: {
     paddingHorizontal: 16,

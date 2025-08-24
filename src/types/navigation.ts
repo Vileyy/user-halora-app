@@ -52,6 +52,16 @@ export type RootStackParamList = {
     orderId: string;
   };
   ContactScreen: undefined;
+  ChatBotScreen: {
+    userProfile?: {
+      id: string;
+      skinType?: string;
+      age?: number;
+      concerns?: string[];
+      currentProducts?: string[];
+    };
+    initialMessage?: string;
+  };
 };
 
 export type TabParamList = {
