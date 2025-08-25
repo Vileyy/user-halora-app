@@ -175,6 +175,87 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
 };
 
 /**
+ * Lấy danh sách product IDs từ purchase history (chỉ orders delivered)
+ * Dùng cho AI recommendations
+ */
+export const getUserPurchaseHistory = async (
+  userId: string
+): Promise<string[]> => {
+  try {
+    console.log("🛒 Getting purchase history for user:", userId);
+    const userOrdersRef = ref(database, `users/${userId}/orders`);
+    const snapshot = await get(userOrdersRef);
+
+    if (snapshot.exists()) {
+      const ordersData = snapshot.val();
+      const purchasedProductIds: string[] = [];
+
+      // Lọc chỉ những orders đã delivered và lấy product IDs
+      Object.values(ordersData).forEach((order: any) => {
+        if (order.status === "delivered" && order.items) {
+          order.items.forEach((item: OrderItem) => {
+            if (item.id && !purchasedProductIds.includes(item.id)) {
+              purchasedProductIds.push(item.id);
+            }
+          });
+        }
+      });
+
+      // Sắp xếp theo thời gian mua gần nhất (orders mới nhất trước)
+      const ordersWithTime = Object.values(ordersData)
+        .filter((order: any) => order.status === "delivered")
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+      // Lấy product IDs theo thứ tự thời gian (sản phẩm mua gần nhất trước)
+      const sortedProductIds: string[] = [];
+      ordersWithTime.forEach((order: any) => {
+        if (order.items) {
+          order.items.forEach((item: OrderItem) => {
+            if (item.id && !sortedProductIds.includes(item.id)) {
+              sortedProductIds.push(item.id);
+            }
+          });
+        }
+      });
+
+      console.log(
+        "🛒 Purchase history found:",
+        sortedProductIds.length,
+        "unique products"
+      );
+      return sortedProductIds;
+    }
+
+    console.log("🛒 No purchase history found for user");
+    return [];
+  } catch (error) {
+    console.error("Error getting purchase history:", error);
+    return [];
+  }
+};
+
+/**
+ * Lấy recently viewed products từ user behavior (có thể lưu trong profile hoặc async storage)
+ * Hiện tại return empty array, có thể implement sau
+ */
+export const getUserRecentlyViewed = async (
+  userId: string
+): Promise<string[]> => {
+  try {
+    // TODO: Implement recently viewed tracking
+    // Có thể lưu trong users/{userId}/behavior/recentlyViewed
+    // Hoặc sử dụng AsyncStorage cho session-based tracking
+    return [];
+  } catch (error) {
+    console.error("Error getting recently viewed:", error);
+    return [];
+  }
+};
+
+/**
  * Cập nhật trạng thái order
  * Path: users/{userId}/orders/{orderId}
  */

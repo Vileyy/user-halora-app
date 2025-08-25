@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// Interface cho AI responses
 export interface ChatMessage {
   id: string;
   text: string;
@@ -15,8 +14,8 @@ export interface ProductRecommendation {
   image: string;
   description: string;
   category: string;
-  reason: string; // Lý do được đề xuất
-  confidence: number; // Độ tin cậy (0-1)
+  reason: string;
+  confidence: number;
 }
 
 export interface BeautyAdviceResponse {
@@ -26,15 +25,14 @@ export interface BeautyAdviceResponse {
   concerns?: string[];
 }
 
-// Cấu hình AI API - có thể dùng OpenAI hoặc Gemini
+// AI API configuration
 const AI_API_CONFIG = {
-  // Sử dụng OpenAI API
   openai: {
     baseURL: "https://api.openai.com/v1",
     model: "gpt-3.5-turbo",
     apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY || "",
   },
-  // Hoặc sử dụng Gemini API
+  // Gemini API
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta",
     model: "gemini-1.5-flash",
@@ -47,7 +45,7 @@ const AI_API_CONFIG = {
 class AIService {
   private currentProvider: "openai" | "gemini" = "gemini";
   private lastRequestTime: number = 0;
-  private minRequestInterval: number = 2000; // 2 seconds between requests (reduced for new API key)
+  private minRequestInterval: number = 2000;
 
   /**
    * Wait for rate limit cooldown
@@ -66,7 +64,7 @@ class AIService {
   }
 
   /**
-   * Gọi API để lấy tư vấn mỹ phẩm
+   * Call API to get cosmetic advice
    */
   async getCosmeticAdvice(
     userMessage: string,
@@ -108,14 +106,11 @@ class AIService {
             ),
           };
         } else {
-          // API failed, use offline advice
           throw new Error("API failed, using offline advice");
         }
       }
     } catch (error) {
       console.error("AI Service Error:", error);
-
-      // Fallback: trả về response cơ bản
       return {
         advice: this.getOfflineAdvice(userMessage),
         recommendedProducts: this.findMatchingProducts(
@@ -208,33 +203,96 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       purchaseHistory?: string[];
       favorites?: string[];
       searchHistory?: string[];
-    }
+    },
+    existingRecommendations: string[] = [] // IDs của sản phẩm đã được đề xuất
   ): Promise<ProductRecommendation[]> {
     try {
       // Wait for rate limit
       await this.waitForRateLimit();
 
-      const prompt = this.buildRecommendationPrompt(
-        currentProducts,
-        userBehavior
+      // Lọc bỏ sản phẩm đã được đề xuất và đã mua
+      const excludedIds = new Set([
+        ...existingRecommendations,
+        ...(userBehavior.purchaseHistory || []),
+        ...(userBehavior.viewedProducts || []).slice(0, 3), // Loại bỏ 3 sản phẩm vừa xem gần nhất
+      ]);
+
+      const availableProducts = currentProducts.filter(
+        (product) => !excludedIds.has(product.id)
       );
 
-      if (this.currentProvider === "openai") {
-        const response = await this.callOpenAI(prompt);
-        return this.parseRecommendations(response.advice, currentProducts);
-      } else {
-        const response = await this.callGemini(prompt);
-        if (response) {
-          return this.parseRecommendations(response.advice, currentProducts);
+      console.log("🔍 Generating recommendations:", {
+        totalProducts: currentProducts.length,
+        availableAfterFilter: availableProducts.length,
+        excludedCount: excludedIds.size,
+        purchaseHistory: userBehavior.purchaseHistory?.slice(0, 3),
+      });
+
+      // Tạo recommendations dựa trên lịch sử mua hàng
+      let recommendations = this.getRecommendationsBasedOnPurchaseHistory(
+        availableProducts,
+        userBehavior.purchaseHistory || []
+      );
+
+      // Nếu không đủ từ purchase history, thêm từ viewed products
+      if (recommendations.length < 5) {
+        const viewedBasedRecs = this.getRecommendationsBasedOnViewed(
+          availableProducts,
+          userBehavior.viewedProducts || [],
+          recommendations.map((r) => r.id)
+        );
+        recommendations = [...recommendations, ...viewedBasedRecs];
+      }
+
+      // Nếu vẫn không đủ, dùng AI hoặc fallback
+      if (recommendations.length < 5) {
+        const prompt = this.buildRecommendationPrompt(
+          availableProducts,
+          userBehavior
+        );
+
+        if (this.currentProvider === "openai") {
+          const response = await this.callOpenAI(prompt);
+          const aiRecs = this.parseRecommendations(
+            response.advice,
+            availableProducts
+          );
+          recommendations = [...recommendations, ...aiRecs];
         } else {
-          // API failed, use fallback
-          throw new Error("API failed, using fallback");
+          const response = await this.callGemini(prompt);
+          if (response) {
+            const aiRecs = this.parseRecommendations(
+              response.advice,
+              availableProducts
+            );
+            recommendations = [...recommendations, ...aiRecs];
+          } else {
+            const fallbackRecs =
+              this.getFallbackRecommendations(availableProducts);
+            recommendations = [...recommendations, ...fallbackRecs];
+          }
         }
       }
+
+      // Nếu vẫn chưa có gì (user mới hoàn toàn), tạo popular recommendations
+      if (recommendations.length === 0 && availableProducts.length > 0) {
+        console.log(
+          "🆕 New user detected, generating popular product recommendations"
+        );
+        recommendations =
+          this.getPopularProductRecommendations(availableProducts);
+      }
+
+      // Loại bỏ duplicate và giới hạn số lượng
+      const uniqueRecommendations =
+        this.removeDuplicateRecommendations(recommendations);
+      return uniqueRecommendations.slice(0, 5);
     } catch (error) {
       console.error("Smart Recommendations Error:", error);
-      // Fallback: trả về recommendations đơn giản dựa trên category
-      return this.getFallbackRecommendations(currentProducts);
+      const availableProducts = currentProducts.filter(
+        (product) => !existingRecommendations.includes(product.id)
+      );
+      return this.getFallbackRecommendations(availableProducts);
     }
   }
 
@@ -290,7 +348,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       baseURL: config.baseURL,
     });
 
-    // Sử dụng endpoint ổn định nhất
+    // use the most stable endpoint
     const endpoints = [
       {
         baseURL: "https://generativelanguage.googleapis.com/v1beta",
@@ -326,7 +384,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       ],
     };
 
-    // Thử từng endpoint cho đến khi thành công
+    // try each endpoint until success
     for (const endpoint of endpoints) {
       try {
         const url = `${endpoint.baseURL}/models/${endpoint.model}:generateContent?key=${config.apiKey}`;
@@ -356,7 +414,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
 
         if (status === 429) {
           console.log("⚠️ Rate limit exceeded, will use offline advice");
-          break; // Break để return offline advice
+          break;
         } else if (status === 403) {
           console.log("⚠️ API key invalid, will use offline advice");
           break;
@@ -369,8 +427,6 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
         break;
       }
     }
-
-    // Nếu tất cả endpoints đều fail, return null để trigger fallback
     return null as any;
   }
 
@@ -477,17 +533,13 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
     availableProducts: any[]
   ): ProductRecommendation[] {
     const recommendations: ProductRecommendation[] = [];
-
-    // Logic đơn giản để match AI response với products có sẵn
-    // Trong thực tế, cần AI response có format structured hơn
     const lines = aiResponse.split("\n").filter((line) => line.includes("-"));
 
     lines.forEach((line, index) => {
-      if (index >= 5) return; // Tối đa 5 recommendations
+      if (index >= 5) return;
 
       const parts = line.split("-");
       if (parts.length >= 2) {
-        // Tìm product phù hợp trong database
         const matchedProduct = this.findSimilarProduct(
           parts[0].trim(),
           availableProducts
@@ -511,11 +563,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
    */
   private findSimilarProduct(searchTerm: string, products: any[]): any | null {
     const normalized = searchTerm.toLowerCase();
-
-    // Tìm theo tên chính xác
     let found = products.find((p) => p.name.toLowerCase().includes(normalized));
-
-    // Tìm theo category nếu không có tên
     if (!found) {
       const categories = ["serum", "cream", "kem", "sữa", "toner", "mask"];
       const matchedCategory = categories.find((cat) =>
@@ -547,6 +595,129 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
       reason: "Sản phẩm phổ biến",
       confidence: 0.6,
     }));
+  }
+
+  /**
+   * Tạo gợi ý cho user mới dựa trên sản phẩm phổ biến và đa dạng category
+   */
+  private getPopularProductRecommendations(
+    products: any[]
+  ): ProductRecommendation[] {
+    if (!products || products.length === 0) return [];
+
+    console.log("🌟 Creating popular product recommendations for new user");
+
+    // Phân loại sản phẩm theo category
+    const productsByCategory = products.reduce((acc: any, product: any) => {
+      const category = product.category?.toLowerCase() || "other";
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(product);
+      return acc;
+    }, {});
+
+    const recommendations: ProductRecommendation[] = [];
+
+    // Ưu tiên các category phổ biến
+    const popularCategories = [
+      "skincare",
+      "tẩy trang",
+      "serum",
+      "kem dưỡng",
+      "toner",
+      "makeup",
+      "son môi",
+      "kem nền",
+      "phấn",
+      "chăm sóc tóc",
+      "dầu gội",
+      "dầu xả",
+    ];
+
+    // Lấy 1-2 sản phẩm từ mỗi category phổ biến
+    for (const category of popularCategories) {
+      const categoryProducts = productsByCategory[category];
+      if (categoryProducts && categoryProducts.length > 0) {
+        // Sắp xếp theo giá (trung bình trước) để phù hợp với nhiều user
+        const sortedProducts = categoryProducts.sort((a: any, b: any) => {
+          const priceA = parseInt(
+            a.price?.toString().replace(/\D/g, "") || "0"
+          );
+          const priceB = parseInt(
+            b.price?.toString().replace(/\D/g, "") || "0"
+          );
+          return priceA - priceB; // Giá thấp trước
+        });
+
+        // Lấy 1 sản phẩm từ category này
+        const selectedProduct = sortedProducts[0];
+        recommendations.push({
+          id: selectedProduct.id,
+          name: selectedProduct.name,
+          price: selectedProduct.price?.toString() || "0",
+          image:
+            selectedProduct.image ||
+            selectedProduct.images?.[0] ||
+            this.generatePlaceholderImage(selectedProduct.name),
+          description: selectedProduct.description || "",
+          category: selectedProduct.category || "",
+          reason: this.generateNewUserReason(category),
+          confidence: 0.7,
+        });
+
+        if (recommendations.length >= 5) break;
+      }
+    }
+
+    // Nếu vẫn chưa đủ 5, lấy random từ các sản phẩm còn lại
+    if (recommendations.length < 5) {
+      const usedIds = new Set(recommendations.map((r) => r.id));
+      const remainingProducts = products.filter((p) => !usedIds.has(p.id));
+      const shuffled = remainingProducts.sort(() => 0.5 - Math.random());
+
+      for (const product of shuffled.slice(0, 5 - recommendations.length)) {
+        recommendations.push({
+          id: product.id,
+          name: product.name,
+          price: product.price?.toString() || "0",
+          image:
+            product.image ||
+            product.images?.[0] ||
+            this.generatePlaceholderImage(product.name),
+          description: product.description || "",
+          category: product.category || "",
+          reason: "Sản phẩm được yêu thích",
+          confidence: 0.65,
+        });
+      }
+    }
+
+    console.log(
+      `🌟 Generated ${recommendations.length} popular recommendations`
+    );
+    return recommendations;
+  }
+
+  /**
+   * Tạo lý do đề xuất cho user mới theo category
+   */
+  private generateNewUserReason(category: string): string {
+    const reasonMap: { [key: string]: string } = {
+      skincare: "Sản phẩm chăm sóc da cơ bản",
+      "tẩy trang": "Bước đầu tiên trong skincare routine",
+      serum: "Tinh chất dưỡng da hiệu quả",
+      "kem dưỡng": "Cần thiết cho mọi loại da",
+      toner: "Cân bằng độ pH cho da",
+      makeup: "Trang điểm tự nhiên hàng ngày",
+      "son môi": "Điểm nhấn cho đôi môi",
+      "kem nền": "Nền trang điểm hoàn hảo",
+      phấn: "Hoàn thiện lớp trang điểm",
+      "chăm sóc tóc": "Chăm sóc tóc khỏe mạnh",
+      "dầu gội": "Làm sạch tóc hiệu quả",
+      "dầu xả": "Dưỡng tóc mềm mượt",
+      other: "Sản phẩm chất lượng được ưa chuộng",
+    };
+
+    return reasonMap[category] || "Sản phẩm chất lượng được ưa chuộng";
   }
 
   /**
@@ -709,12 +880,407 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
       id: product.id,
       name: product.name,
       price: product.price?.toString() || "0",
-      image: product.image || "",
+      image:
+        product.image ||
+        product.images?.[0] ||
+        `https://via.placeholder.com/300x300/FF99CC/FFFFFF?text=${encodeURIComponent(
+          product.name?.substring(0, 2) || "SP"
+        )}`,
       description: product.description || "",
       category: product.category || "",
-      reason: "Sản phẩm phù hợp với yêu cầu của bạn",
+      reason: this.generateReasonForProduct(product, message),
       confidence: 0.9,
     }));
+  }
+
+  /**
+   * Tạo recommendations dựa trên lịch sử mua hàng
+   */
+  private getRecommendationsBasedOnPurchaseHistory(
+    availableProducts: any[],
+    purchaseHistory: string[]
+  ): ProductRecommendation[] {
+    if (!purchaseHistory.length) return [];
+
+    const recommendations: ProductRecommendation[] = [];
+
+    // Lấy thông tin các sản phẩm đã mua
+    const purchasedProducts = purchaseHistory
+      .map((id) => availableProducts.find((p) => p.id === id))
+      .filter(Boolean)
+      .slice(0, 3); // Chỉ xem 3 sản phẩm gần nhất
+
+    console.log(
+      "📦 Purchased products for analysis:",
+      purchasedProducts.map((p) => p?.name)
+    );
+
+    for (const purchasedProduct of purchasedProducts) {
+      if (!purchasedProduct) continue;
+
+      // Tìm sản phẩm cùng category hoặc tương tự
+      const similarProducts = this.findSimilarProductsByCategory(
+        availableProducts,
+        purchasedProduct,
+        recommendations.map((r) => r.id)
+      );
+
+      recommendations.push(...similarProducts);
+
+      if (recommendations.length >= 5) break;
+    }
+
+    return recommendations.slice(0, 5);
+  }
+
+  /**
+   * Tìm sản phẩm tương tự dựa trên category và features
+   */
+  private findSimilarProductsByCategory(
+    availableProducts: any[],
+    referenceProduct: any,
+    excludeIds: string[]
+  ): ProductRecommendation[] {
+    const category = referenceProduct.category?.toLowerCase() || "";
+    const name = referenceProduct.name?.toLowerCase() || "";
+    const recommendations: ProductRecommendation[] = [];
+
+    // Phân loại sản phẩm để tìm tương tự
+    const categoryKeywords = this.extractCategoryKeywords(name, category);
+
+    const similarProducts = availableProducts.filter((product) => {
+      if (
+        excludeIds.includes(product.id) ||
+        product.id === referenceProduct.id
+      ) {
+        return false;
+      }
+
+      const productName = product.name?.toLowerCase() || "";
+      const productCategory = product.category?.toLowerCase() || "";
+
+      // Kiểm tra cùng category chính xác
+      if (productCategory === category) return true;
+
+      // Kiểm tra keywords tương tự
+      return categoryKeywords.some(
+        (keyword) =>
+          productName.includes(keyword) || productCategory.includes(keyword)
+      );
+    });
+
+    // Sort theo mức độ tương tự và chọn top 2
+    const scored = similarProducts
+      .map((product) => ({
+        product,
+        score: this.calculateSimilarityScore(referenceProduct, product),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2);
+
+    for (const { product } of scored) {
+      recommendations.push({
+        id: product.id,
+        name: product.name,
+        price: product.price?.toString() || "0",
+        image:
+          product.image ||
+          product.images?.[0] ||
+          this.generatePlaceholderImage(product.name),
+        description: product.description || "",
+        category: product.category || "",
+        reason: this.generatePurchaseBasedReason(referenceProduct, product),
+        confidence: 0.85,
+      });
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * Tạo recommendations dựa trên sản phẩm đã xem
+   */
+  private getRecommendationsBasedOnViewed(
+    availableProducts: any[],
+    viewedProducts: string[],
+    excludeIds: string[]
+  ): ProductRecommendation[] {
+    if (!viewedProducts.length) return [];
+
+    const recommendations: ProductRecommendation[] = [];
+    const recentViewed = viewedProducts.slice(0, 2); // 2 sản phẩm xem gần nhất
+
+    for (const viewedId of recentViewed) {
+      const viewedProduct = availableProducts.find((p) => p.id === viewedId);
+      if (!viewedProduct) continue;
+
+      const similar = this.findSimilarProductsByCategory(
+        availableProducts,
+        viewedProduct,
+        [...excludeIds, ...recommendations.map((r) => r.id)]
+      );
+
+      // Cập nhật reason cho viewed-based recommendations
+      similar.forEach((rec) => {
+        rec.reason = `Vì bạn đã xem ${viewedProduct.name}`;
+        rec.confidence = 0.75;
+      });
+
+      recommendations.push(...similar);
+      if (recommendations.length >= 3) break;
+    }
+
+    return recommendations.slice(0, 3);
+  }
+
+  /**
+   * Loại bỏ recommendations trùng lặp
+   */
+  private removeDuplicateRecommendations(
+    recommendations: ProductRecommendation[]
+  ): ProductRecommendation[] {
+    const seen = new Set<string>();
+    return recommendations.filter((rec) => {
+      if (seen.has(rec.id)) return false;
+      seen.add(rec.id);
+      return true;
+    });
+  }
+
+  /**
+   * Trích xuất category keywords để tìm sản phẩm tương tự
+   */
+  private extractCategoryKeywords(name: string, category: string): string[] {
+    const keywords = new Set<string>();
+
+    // Thêm category chính
+    if (category) keywords.add(category);
+
+    // Phân tích tên sản phẩm để tìm keywords
+    const nameWords = name.split(/\s+/).map((w) => w.toLowerCase());
+
+    // Skincare keywords
+    const skincareKeywords = [
+      "tẩy trang",
+      "cleanser",
+      "sữa rửa mặt",
+      "gel rửa mặt",
+      "toner",
+      "nước hoa hồng",
+      "serum",
+      "tinh chất",
+      "kem dưỡng",
+      "moisturizer",
+      "kem chống nắng",
+      "sunscreen",
+      "mask",
+      "mặt nạ",
+      "kem mắt",
+      "eye cream",
+    ];
+
+    // Makeup keywords
+    const makeupKeywords = [
+      "kem nền",
+      "foundation",
+      "concealer",
+      "che khuyết điểm",
+      "phấn phủ",
+      "powder",
+      "má hồng",
+      "blush",
+      "son môi",
+      "lipstick",
+      "son bóng",
+      "lip gloss",
+      "mascara",
+      "eyeliner",
+      "kẻ mắt",
+      "phấn mắt",
+      "eyeshadow",
+    ];
+
+    // Haircare keywords
+    const haircareKeywords = [
+      "dầu gội",
+      "shampoo",
+      "dầu xả",
+      "conditioner",
+      "kem ủ tóc",
+      "hair mask",
+      "serum tóc",
+      "hair serum",
+    ];
+
+    const allKeywords = [
+      ...skincareKeywords,
+      ...makeupKeywords,
+      ...haircareKeywords,
+    ];
+
+    for (const keyword of allKeywords) {
+      if (name.includes(keyword)) {
+        keywords.add(keyword);
+        // Thêm từ đồng nghĩa
+        if (keyword === "tẩy trang") keywords.add("cleanser");
+        if (keyword === "kem dưỡng") keywords.add("moisturizer");
+        if (keyword === "chống nắng") keywords.add("sunscreen");
+      }
+    }
+
+    return Array.from(keywords);
+  }
+
+  /**
+   * Tính điểm tương đồng giữa 2 sản phẩm
+   */
+  private calculateSimilarityScore(product1: any, product2: any): number {
+    let score = 0;
+
+    // Cùng category: +0.5
+    if (product1.category === product2.category) score += 0.5;
+
+    // Tên có từ khóa chung: +0.3
+    const name1Words = product1.name?.toLowerCase().split(/\s+/) || [];
+    const name2Words = product2.name?.toLowerCase().split(/\s+/) || [];
+    const commonWords = name1Words.filter((word: string) =>
+      name2Words.includes(word)
+    );
+    if (commonWords.length > 0) score += 0.3;
+
+    // Giá cả tương đương (trong vòng 50%): +0.2
+    const price1 = parseInt(
+      product1.price?.toString().replace(/\D/g, "") || "0"
+    );
+    const price2 = parseInt(
+      product2.price?.toString().replace(/\D/g, "") || "0"
+    );
+    if (price1 > 0 && price2 > 0) {
+      const priceDiff = Math.abs(price1 - price2) / Math.max(price1, price2);
+      if (priceDiff <= 0.5) score += 0.2;
+    }
+
+    return score;
+  }
+
+  /**
+   * Tạo lý do đề xuất dựa trên sản phẩm đã mua
+   */
+  private generatePurchaseBasedReason(
+    purchasedProduct: any,
+    recommendedProduct: any
+  ): string {
+    const purchasedName = purchasedProduct.name?.toLowerCase() || "";
+    const recommendedName = recommendedProduct.name?.toLowerCase() || "";
+
+    // Cùng loại sản phẩm
+    if (
+      purchasedName.includes("tẩy trang") &&
+      recommendedName.includes("tẩy trang")
+    ) {
+      return `Tẩy trang khác phù hợp với routine của bạn`;
+    }
+
+    if (purchasedName.includes("serum") && recommendedName.includes("serum")) {
+      return `Serum bổ sung cho skincare routine`;
+    }
+
+    if (
+      purchasedName.includes("kem dưỡng") &&
+      recommendedName.includes("kem dưỡng")
+    ) {
+      return `Kem dưỡng thay thế hoặc dùng luân phiên`;
+    }
+
+    if (purchasedName.includes("son") && recommendedName.includes("son")) {
+      return `Màu son mới để thay đổi phong cách`;
+    }
+
+    // Sản phẩm bổ sung
+    if (
+      purchasedName.includes("tẩy trang") &&
+      recommendedName.includes("toner")
+    ) {
+      return `Toner bổ sung sau bước tẩy trang`;
+    }
+
+    if (purchasedName.includes("toner") && recommendedName.includes("serum")) {
+      return `Serum sử dụng sau toner để tăng hiệu quả`;
+    }
+
+    if (purchasedProduct.category === recommendedProduct.category) {
+      return `Cùng danh mục với sản phẩm bạn đã mua`;
+    }
+
+    return `Phù hợp với sở thích của bạn`;
+  }
+
+  /**
+   * Tạo placeholder image thông minh
+   */
+  private generatePlaceholderImage(productName: string): string {
+    const initials = productName?.substring(0, 2).toUpperCase() || "SP";
+    return `https://via.placeholder.com/300x300/FF99CC/FFFFFF?text=${encodeURIComponent(
+      initials
+    )}`;
+  }
+
+  /**
+   * Tạo lý do đề xuất sản phẩm thông minh
+   */
+  private generateReasonForProduct(product: any, userMessage: string): string {
+    const lowerMessage = userMessage.toLowerCase();
+    const productName = product.name?.toLowerCase() || "";
+    const productCategory = product.category?.toLowerCase() || "";
+
+    // Lý do dựa trên loại sản phẩm và nhu cầu người dùng
+    if (
+      lowerMessage.includes("da dầu") &&
+      (productName.includes("toner") || productName.includes("gel"))
+    ) {
+      return "Phù hợp cho da dầu, kiểm soát bã nhờn";
+    }
+
+    if (
+      lowerMessage.includes("da khô") &&
+      (productName.includes("kem") || productName.includes("dưỡng"))
+    ) {
+      return "Cung cấp độ ẩm cho da khô";
+    }
+
+    if (
+      lowerMessage.includes("mụn") &&
+      (productName.includes("trị mụn") || productName.includes("acne"))
+    ) {
+      return "Hiệu quả trong việc điều trị mụn";
+    }
+
+    if (lowerMessage.includes("chống nắng") && productName.includes("spf")) {
+      return "Bảo vệ da khỏi tia UV có hại";
+    }
+
+    if (lowerMessage.includes("tẩy trang") && productName.includes("tẩy")) {
+      return "Làm sạch sâu, loại bỏ makeup hiệu quả";
+    }
+
+    if (lowerMessage.includes("serum") && productName.includes("serum")) {
+      return "Cung cấp dưỡng chất tập trung";
+    }
+
+    if (lowerMessage.includes("dưỡng ẩm") && productName.includes("dưỡng")) {
+      return "Cấp ẩm và nuôi dưỡng da";
+    }
+
+    // Lý do mặc định dựa trên category
+    if (productCategory.includes("skincare")) {
+      return "Sản phẩm chăm sóc da chất lượng";
+    } else if (productCategory.includes("makeup")) {
+      return "Trang điểm tự nhiên, bền màu";
+    } else if (productCategory.includes("serum")) {
+      return "Tinh chất dưỡng da hiệu quả";
+    }
+
+    return "Được nhiều khách hàng tin dùng";
   }
 
   /**

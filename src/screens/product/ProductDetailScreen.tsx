@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: "#FF6B7D",
-    marginBottom: 14,
+    marginBottom: -10,
   },
   ratingRow: {
     flexDirection: "row",

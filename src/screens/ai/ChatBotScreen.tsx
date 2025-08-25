@@ -12,6 +12,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -164,6 +165,13 @@ Bạn cần tư vấn gì hôm nay?`,
     handleSendMessage(reply);
   };
 
+  const formatPrice = (price: string | number): string => {
+    if (!price || price === "0") return "0";
+    const numPrice =
+      typeof price === "string" ? parseInt(price.replace(/\D/g, "")) : price;
+    return numPrice.toLocaleString("vi-VN");
+  };
+
   const handleViewProducts = () => {
     Alert.alert(
       "Xem sản phẩm được đề xuất",
@@ -209,6 +217,62 @@ Bạn cần tư vấn gì hôm nay?`,
         >
           {item.text}
         </Text>
+
+        {/* Hiển thị product recommendations */}
+        {item.recommendedProducts && item.recommendedProducts.length > 0 && (
+          <View style={styles.productsContainer}>
+            {item.recommendedProducts.map((product, index) => (
+              <TouchableOpacity
+                key={`${product.id}_${index}`}
+                style={styles.productCard}
+                onPress={() => {
+                  // Navigate to product detail or add to cart
+                  Alert.alert(
+                    "Sản phẩm được đề xuất",
+                    `${product.name}\nGiá: ${product.price} VNĐ\n\nLý do đề xuất: ${product.reason}`,
+                    [
+                      { text: "Đóng", style: "cancel" },
+                      {
+                        text: "Xem chi tiết",
+                        onPress: () => console.log("View product:", product.id),
+                      },
+                    ]
+                  );
+                }}
+              >
+                <View style={styles.productImageContainer}>
+                  <Image
+                    source={{
+                      uri:
+                        product.image ||
+                        "https://via.placeholder.com/60x60/FF99CC/FFFFFF?text=SP",
+                    }}
+                    style={styles.productImage}
+                    defaultSource={require("../../assets/image/halora-icon.png")}
+                    resizeMode="cover"
+                    onError={() =>
+                      console.log("Image failed to load:", product.image)
+                    }
+                  />
+                </View>
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {product.name}
+                  </Text>
+                  <Text style={styles.productPrice}>
+                    {formatPrice(product.price)} VNĐ
+                  </Text>
+                  <Text style={styles.productReason} numberOfLines={2}>
+                    {product.reason}
+                  </Text>
+                </View>
+                <View style={styles.productAction}>
+                  <Ionicons name="chevron-forward" size={16} color="#FF99CC" />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <Text
           style={[
@@ -536,6 +600,60 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: "#e0e0e0",
+  },
+  productsContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  productCard: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    alignItems: "center",
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  productImageContainer: {
+    marginRight: 12,
+  },
+  productImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: "#f8f9fa",
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  productPrice: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#FF99CC",
+    marginBottom: 2,
+  },
+  productReason: {
+    fontSize: 11,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  productAction: {
+    marginLeft: 8,
   },
 });
 

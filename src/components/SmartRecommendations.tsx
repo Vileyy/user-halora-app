@@ -40,14 +40,41 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shownRecommendations, setShownRecommendations] = useState<string[]>(
+    []
+  );
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
 
   useEffect(() => {
     loadRecommendations();
-  }, [context.userId, context.currentProduct]);
+  }, [
+    context.userId,
+    context.currentProduct,
+    currentProducts.length,
+    context.purchaseHistory?.length, 
+    context.recentlyViewed?.length, 
+    JSON.stringify(context.purchaseHistory?.slice(0, 3)),
+  ]);
+
+  // Auto refresh every 5 minutes nếu user đang active
+  useEffect(() => {
+    const autoRefreshInterval = setInterval(() => {
+      if (!loading && recommendations.length > 0) {
+        setShownRecommendations([]); 
+        loadRecommendations();
+      }
+    }, 1 * 60 * 1000); 
+
+    return () => clearInterval(autoRefreshInterval);
+  }, [loading, recommendations.length]);
 
   const loadRecommendations = async () => {
-    if (!context.userId) return;
+    if (!context.userId || currentProducts.length === 0) {
+      console.log("⏳ Waiting for user ID and products to load...");
+      return;
+    }
 
+    console.log("🚀 Starting recommendations load for user:", context.userId);
     setLoading(true);
     setError(null);
 
@@ -59,19 +86,39 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
         searchHistory: context.searchHistory,
       };
 
+      console.log("🎯 Loading recommendations with context:", {
+        userId: context.userId,
+        purchaseHistory: context.purchaseHistory?.slice(0, 3),
+        recentlyViewed: context.recentlyViewed?.slice(0, 3),
+        shownRecommendations: shownRecommendations.slice(0, 3),
+      });
+
       const recs = await aiService.getSmartRecommendations(
         context.userId,
         currentProducts,
-        userBehavior
+        userBehavior,
+        shownRecommendations
       );
 
       setRecommendations(recs.slice(0, maxItems));
+      setLastRefreshTime(Date.now());
+
+      // save the new recommendations
+      const newShownIds = recs.map((r) => r.id);
+      setShownRecommendations((prev) => [...prev, ...newShownIds]);
     } catch (err) {
       console.error("Smart Recommendations Error:", err);
       setError("Không thể tải gợi ý. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = () => {
+    console.log("🔄 Manual refresh triggered");
+    // Reset shown recommendations to see the new products
+    setShownRecommendations([]);
+    loadRecommendations();
   };
 
   const handleProductPress = (product: ProductRecommendation) => {
@@ -93,9 +140,9 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
   };
 
   const getConfidenceColor = (confidence: number): string => {
-    if (confidence >= 0.8) return "#4CAF50"; // Xanh lá - high confidence
-    if (confidence >= 0.6) return "#FF9800"; // Cam - medium confidence
-    return "#757575"; // Xám - low confidence
+    if (confidence >= 0.8) return "#4CAF50"; // Xanh lá
+    if (confidence >= 0.6) return "#FF9800"; // Cam
+    return "#757575"; // Xám
   };
 
   const renderRecommendationItem = ({
@@ -187,7 +234,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
 
         {loading && <ActivityIndicator size="small" color="#FF99CC" />}
 
-        <TouchableOpacity onPress={loadRecommendations} disabled={loading}>
+        <TouchableOpacity onPress={handleRefresh} disabled={loading}>
           <Ionicons
             name="refresh"
             size={20}
@@ -247,6 +294,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     marginRight: 8,
+    marginBottom: 10,
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -289,7 +337,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#FF99CC",
+    color: "red",
     marginBottom: 8,
   },
   reasonContainer: {

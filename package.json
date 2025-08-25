@@ -41,7 +41,9 @@
     "react-redux": "^9.2.0",
     "redux-persist": "^6.0.0",
     "yup": "^1.7.0",
-    "expo-dev-client": "~5.2.4"
+    "expo-dev-client": "~5.2.4",
+    "expo-av": "~15.1.7",
+    "expo-speech": "~13.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

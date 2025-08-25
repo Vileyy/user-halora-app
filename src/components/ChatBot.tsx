@@ -12,9 +12,11 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { aiService } from "../services/aiService";
+import { speechService } from "../services/speechService";
 import { ChatMessage, UserProfile } from "../types/ai";
 
 interface ChatBotProps {
@@ -35,10 +37,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState<any>(null);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const recordingAnim = useRef(new Animated.Value(1)).current;
 
   // Quick reply suggestions
   const [quickReplies] = useState([
@@ -75,6 +81,12 @@ const ChatBot: React.FC<ChatBotProps> = ({
 🔍 Tìm kiếm sản phẩm theo nhu cầu
 💡 Giải đáp các thắc mắc về skincare
 
+✍️ **Cách sử dụng:**
+- Gõ tin nhắn để chat bình thường
+- Nhấn nút 🎤 để thử voice input (demo mode)
+
+🎤 **Voice Demo:** Sau khi "ghi âm", bạn sẽ thấy menu chọn nội dung hoặc nhập tự do.
+
 Bạn cần tư vấn gì hôm nay?`,
       isUser: false,
       timestamp: new Date(),
@@ -87,7 +99,7 @@ Bạn cần tư vấn gì hôm nay?`,
       "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
-        // Auto scroll khi keyboard xuất hiện
+        // Auto scroll when keyboard appears
         setTimeout(() => scrollToBottom(), 100);
       }
     );
@@ -145,7 +157,7 @@ Bạn cần tư vấn gì hôm nay?`,
         availableProducts
       );
 
-      // Animation typing effect 
+      // Animation typing effect
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const botMessage: ChatMessage = {
@@ -165,7 +177,7 @@ Bạn cần tư vấn gì hôm nay?`,
           text: `💡 Tôi tìm thấy những sản phẩm phù hợp trong cửa hàng:`,
           isUser: false,
           timestamp: new Date(),
-          recommendedProducts: response.recommendedProducts, 
+          recommendedProducts: response.recommendedProducts,
         };
 
         setTimeout(() => {
@@ -192,6 +204,128 @@ Bạn cần tư vấn gì hôm nay?`,
 
   const handleQuickReply = (reply: string) => {
     handleSendMessage(reply);
+  };
+
+  // Voice Recording Functions
+  const startRecording = async () => {
+    try {
+      // Request permissions
+      const hasPermission = await speechService.requestPermissions();
+      if (!hasPermission) {
+        Alert.alert(
+          "Quyền truy cập microphone",
+          "Ứng dụng cần quyền truy cập microphone để ghi âm tin nhắn voice.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      // Start recording
+      const newRecording = await speechService.startRecording();
+
+      setRecording(newRecording);
+      setIsRecording(true);
+
+      // Start recording animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(recordingAnim, {
+            toValue: 0.3,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(recordingAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      Alert.alert("Lỗi", "Không thể bắt đầu ghi âm. Vui lòng thử lại.");
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+
+    try {
+      setIsRecording(false);
+      setIsProcessingVoice(true);
+
+      // Stop recording animation
+      recordingAnim.stopAnimation();
+      recordingAnim.setValue(1);
+
+      const uri = await speechService.stopRecording(recording);
+
+      if (uri) {
+        // Process the audio file with speech-to-text
+        await processVoiceMessage(uri);
+      }
+
+      setRecording(null);
+    } catch (error) {
+      console.error("Failed to stop recording:", error);
+      Alert.alert("Lỗi", "Không thể hoàn thành ghi âm. Vui lòng thử lại.");
+    } finally {
+      setIsProcessingVoice(false);
+    }
+  };
+
+  const processVoiceMessage = async (audioUri: string) => {
+    try {
+      // Convert speech to text using speech service
+      const transcribedText = await speechService.speechToText(audioUri);
+
+      if (transcribedText && transcribedText.trim()) {
+        // Auto-send the transcribed text as message
+        await handleSendMessage(transcribedText);
+      } else {
+        Alert.alert(
+          "Không thể nhận diện giọng nói",
+          "Vui lòng thử nói rõ hơn hoặc nhập tin nhắn text.",
+          [
+            {
+              text: "Nhập tin nhắn",
+              onPress: () => {
+                // Focus on text input
+                setTimeout(() => {
+                  // You can add auto-focus logic here
+                }, 100);
+              },
+            },
+            { text: "Thử lại", onPress: startRecording },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error("Failed to process voice message:", error);
+      Alert.alert(
+        "Lỗi xử lý giọng nói",
+        "Không thể chuyển đổi giọng nói thành văn bản. Vui lòng thử lại hoặc nhập tin nhắn text.",
+        [
+          {
+            text: "Nhập tin nhắn",
+            style: "default",
+          },
+          {
+            text: "Thử lại",
+            onPress: startRecording,
+            style: "default",
+          },
+        ]
+      );
+    }
+  };
+
+  const handleVoicePress = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const handleClose = () => {
@@ -240,7 +374,7 @@ Bạn cần tư vấn gì hôm nay?`,
           {item.text}
         </Text>
 
-        {/* Hiển thị product recommendations */}
+        {/* Display product recommendations */}
         {item.recommendedProducts && item.recommendedProducts.length > 0 && (
           <View style={styles.productsContainer}>
             {item.recommendedProducts.map((product, index) => (
@@ -249,6 +383,21 @@ Bạn cần tư vấn gì hôm nay?`,
                 style={styles.productCard}
                 onPress={() => onProductRecommend?.(product.id)}
               >
+                <View style={styles.productImageContainer}>
+                  <Image
+                    source={{
+                      uri:
+                        product.image ||
+                        "https://via.placeholder.com/60x60/FF99CC/FFFFFF?text=SP",
+                    }}
+                    style={styles.productImage}
+                    defaultSource={require("../assets/image/halora-icon.png")}
+                    resizeMode="cover"
+                    onError={() =>
+                      console.log("Image failed to load:", product.image)
+                    }
+                  />
+                </View>
                 <View style={styles.productInfo}>
                   <Text style={styles.productName} numberOfLines={2}>
                     {product.name}
@@ -256,7 +405,7 @@ Bạn cần tư vấn gì hôm nay?`,
                   <Text style={styles.productPrice}>
                     {formatPrice(product.price)} VNĐ
                   </Text>
-                  <Text style={styles.productReason} numberOfLines={1}>
+                  <Text style={styles.productReason} numberOfLines={2}>
                     {product.reason}
                   </Text>
                 </View>
@@ -293,6 +442,19 @@ Bạn cần tư vấn gì hôm nay?`,
       <View style={styles.typingBubble}>
         <ActivityIndicator size="small" color="#666" />
         <Text style={styles.typingText}>Đang soạn tin...</Text>
+      </View>
+    </View>
+  );
+
+  const renderRecordingIndicator = () => (
+    <View style={styles.recordingContainer}>
+      <View style={styles.recordingIndicator}>
+        <Animated.View
+          style={[styles.recordingDot, { opacity: recordingAnim }]}
+        />
+        <Text style={styles.recordingText}>
+          🎤 Đang ghi âm (Demo)... Nhấn nút đỏ để dừng
+        </Text>
       </View>
     </View>
   );
@@ -345,7 +507,13 @@ Bạn cần tư vấn gì hôm nay?`,
             <View>
               <Text style={styles.headerTitle}>Halora AI Assistant</Text>
               <Text style={styles.headerSubtitle}>
-                {isTyping ? "Đang trả lời..." : "Tư vấn viên AI"}
+                {isRecording
+                  ? "🎤 Đang ghi âm..."
+                  : isProcessingVoice
+                  ? "🔄 Đang xử lý voice..."
+                  : isTyping
+                  ? "✍️ Đang trả lời..."
+                  : "💬 Tư vấn viên AI (Voice Demo)"}
               </Text>
             </View>
           </View>
@@ -369,7 +537,10 @@ Bạn cần tư vấn gì hôm nay?`,
         {/* Typing Indicator */}
         {isTyping && renderTypingIndicator()}
 
-        {/* Quick Replies - chỉ hiện khi chưa có tin nhắn nào */}
+        {/* Recording Indicator */}
+        {isRecording && renderRecordingIndicator()}
+
+        {/* Quick Replies */}
         {messages.length <= 1 && renderQuickReplies()}
 
         {/* Input */}
@@ -379,11 +550,33 @@ Bạn cần tư vấn gì hôm nay?`,
             value={inputText}
             onChangeText={setInputText}
             onFocus={handleInputFocus}
-            placeholder="Nhập câu hỏi của bạn..."
+            placeholder="Nhập câu hỏi của bạn hoặc nhấn mic để ghi âm..."
             placeholderTextColor="#999"
             multiline
             maxLength={500}
+            editable={!isRecording && !isProcessingVoice}
           />
+
+          {/* Voice Recording Button */}
+          <TouchableOpacity
+            style={[
+              styles.voiceButton,
+              isRecording && styles.voiceButtonRecording,
+              isProcessingVoice && styles.voiceButtonProcessing,
+            ]}
+            onPress={handleVoicePress}
+            disabled={isTyping || isProcessingVoice}
+          >
+            {isProcessingVoice ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={isRecording ? "stop" : "mic"}
+                size={20}
+                color="#fff"
+              />
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[
@@ -391,7 +584,9 @@ Bạn cần tư vấn gì hôm nay?`,
               !inputText.trim() && styles.sendButtonDisabled,
             ]}
             onPress={() => handleSendMessage()}
-            disabled={!inputText.trim() || isTyping}
+            disabled={
+              !inputText.trim() || isTyping || isRecording || isProcessingVoice
+            }
           >
             <Ionicons
               name="send"
@@ -533,6 +728,31 @@ const styles = StyleSheet.create({
     color: "#666",
     marginLeft: 8,
   },
+  recordingContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    alignItems: "center",
+  },
+  recordingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f44336",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#fff",
+    marginRight: 8,
+  },
+  recordingText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "500",
+  },
   quickRepliesContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -572,6 +792,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0",
     alignItems: "center",
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  productImageContainer: {
+    marginRight: 12,
+  },
+  productImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: "#fff",
   },
   productInfo: {
     flex: 1,
@@ -614,6 +852,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxHeight: 100,
     marginRight: 8,
+  },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4CAF50",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  voiceButtonRecording: {
+    backgroundColor: "#f44336",
+  },
+  voiceButtonProcessing: {
+    backgroundColor: "#FF9800",
   },
   sendButton: {
     width: 40,
