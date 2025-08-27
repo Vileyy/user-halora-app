@@ -34,6 +34,7 @@ import {
 } from "../../utils/userValidation";
 import { SmartRecommendationContext, UserProfile } from "../../types/ai";
 import { getDatabase, ref, onValue } from "firebase/database";
+import VariantSelector, { Variant } from "../../components/VariantSelector";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -70,6 +71,18 @@ export default function ProductDetailScreen() {
   const [showQuantityModal, setShowQuantityModal] = useState<boolean>(false);
   const [tempQuantity, setTempQuantity] = useState<number>(1);
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [brandInfo, setBrandInfo] = useState<{
+    name: string;
+    logoUrl?: string;
+  } | null>(null);
+  const [showVariantSelector, setShowVariantSelector] =
+    useState<boolean>(false);
+  const [variantActionType, setVariantActionType] = useState<
+    "addToCart" | "buyNow"
+  >("addToCart");
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
+    product.variants && product.variants.length > 0 ? product.variants[0] : null
+  );
 
   // AI Recommendation context
   const [recommendationContext, setRecommendationContext] =
@@ -106,6 +119,30 @@ export default function ProductDetailScreen() {
     return () => unsubscribe();
   }, []);
 
+  // Fetch brand information
+  useEffect(() => {
+    if (product.brandId) {
+      const db = getDatabase();
+      const brandRef = ref(db, `brands/${product.brandId}`);
+
+      const unsubscribe = onValue(brandRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const brandData = snapshot.val();
+          setBrandInfo({
+            name: brandData.name,
+            logoUrl: brandData.logoUrl,
+          });
+        } else {
+          setBrandInfo(null);
+        }
+      });
+
+      return () => unsubscribe();
+    } else {
+      setBrandInfo(null);
+    }
+  }, [product.brandId]);
+
   useEffect(() => {
     // Track product view time for AI recommendations
     const startTime = Date.now();
@@ -129,12 +166,15 @@ export default function ProductDetailScreen() {
   }, [product.id]);
 
   const formattedPrice = useMemo(() => {
+    if (selectedVariant) {
+      return `${selectedVariant.price.toLocaleString()}₫`;
+    }
     const priceStr = product.price || "0";
     const priceNumber = parseInt(priceStr.toString().replace(/[^\d]/g, ""));
     return isNaN(priceNumber) || priceNumber === 0
       ? "0₫"
       : `${priceNumber.toLocaleString()}₫`;
-  }, [product.price]);
+  }, [product.price, selectedVariant]);
 
   const onToggleFavorite = () => setIsFavorite((prev) => !prev);
 
@@ -195,7 +235,89 @@ export default function ProductDetailScreen() {
       setShowAuthModal(true);
       return;
     }
-    openQuantityModal();
+
+    // Nếu có variants, hiển thị variant selector
+    if (product.variants && product.variants.length > 0) {
+      setVariantActionType("addToCart");
+      setShowVariantSelector(true);
+    } else {
+      openQuantityModal();
+    }
+  };
+
+  // Xử lý khi người dùng chọn variant
+  const handleVariantSelect = (variant: Variant, quantity: number) => {
+    setSelectedVariant(variant);
+
+    if (variantActionType === "addToCart") {
+      // Thêm vào giỏ hàng với variant đã chọn
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      addItemToCart({
+        id: product.id,
+        name: product.name,
+        price: variant.price.toString(),
+        description: product.description,
+        image: product.image,
+        category: product.category,
+        quantity: quantity,
+        variant: {
+          size: variant.size,
+          price: variant.price,
+        },
+      });
+      Toast.show({
+        type: "success",
+        text1: "Đã thêm vào giỏ hàng",
+        text2: `${product.name} (${variant.size}ml) x${quantity}`,
+        position: "top",
+        visibilityTime: 3000,
+        topOffset: 60,
+      });
+    } else if (variantActionType === "buyNow") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      addItemToCart({
+        id: product.id,
+        name: product.name,
+        price: variant.price.toString(),
+        description: product.description,
+        image: product.image,
+        category: product.category,
+        quantity: quantity,
+        variant: {
+          size: variant.size,
+          price: variant.price,
+        },
+      });
+      Toast.show({
+        type: "success",
+        text1: "Mua ngay",
+        text2: "Đang chuyển đến trang thanh toán...",
+        position: "top",
+        visibilityTime: 2000,
+        topOffset: 60,
+        onHide: () => {
+          navigation.navigate("CheckoutScreen", {
+            selectedItems: [
+              {
+                id: product.id,
+                name: product.name,
+                price: variant.price.toString(),
+                description: product.description,
+                image: product.image,
+                category: product.category,
+                quantity: quantity,
+                selected: true,
+                variant: {
+                  size: variant.size,
+                  price: variant.price,
+                },
+              },
+            ],
+            totalPrice: variant.price * quantity,
+          });
+        },
+      });
+    }
   };
 
   const onBuyNow = () => {
@@ -204,7 +326,7 @@ export default function ProductDetailScreen() {
       return;
     }
 
-    // Kiểm tra thông tin người dùng
+    // Check user info
     const validation = validateUserForOrder(user);
     if (!validation.isValid) {
       setValidationResult(validation);
@@ -212,6 +334,14 @@ export default function ProductDetailScreen() {
       return;
     }
 
+    // If has variants, show variant selector
+    if (product.variants && product.variants.length > 0) {
+      setVariantActionType("buyNow");
+      setShowVariantSelector(true);
+      return;
+    }
+
+    // Logic for products without variants
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     addItemToCart({
       id: product.id,
@@ -230,7 +360,7 @@ export default function ProductDetailScreen() {
       visibilityTime: 2000,
       topOffset: 60,
       onHide: () => {
-        // Navigate to checkout screen with current item
+        // Navigate to checkout screen
         navigation.navigate("CheckoutScreen", {
           selectedItems: [
             {
@@ -314,6 +444,28 @@ export default function ProductDetailScreen() {
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{product.name}</Text>
             <Text style={styles.productPrice}>{formattedPrice}</Text>
+            {selectedVariant && (
+              <View style={styles.variantInfo}>
+                <Text style={styles.variantText}>
+                  Dung tích: {selectedVariant.size}ml • Còn{" "}
+                  {selectedVariant.stock} sản phẩm
+                </Text>
+              </View>
+            )}
+            {product.variants && product.variants.length > 1 && (
+              <TouchableOpacity
+                style={styles.changeVariantButton}
+                onPress={() => {
+                  setVariantActionType("addToCart");
+                  setShowVariantSelector(true);
+                }}
+              >
+                <Text style={styles.changeVariantText}>
+                  Chọn dung tích khác
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#FF6B7D" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Delivery Info */}
@@ -344,15 +496,17 @@ export default function ProductDetailScreen() {
             <Text style={styles.sectionTitle}>Thông tin chi tiết</Text>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Thương hiệu</Text>
-              <Text style={styles.specValue}>Innisfree</Text>
+              <Text style={styles.specValue}>
+                {brandInfo ? brandInfo.name : "Chưa có thông tin"}
+              </Text>
             </View>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Xuất xứ</Text>
-              <Text style={styles.specValue}>Hàn Quốc</Text>
+              {/* <Text style={styles.specValue}>Hàn Quốc</Text> */}
             </View>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Dung tích</Text>
-              <Text style={styles.specValue}>50ml</Text>
+              {/* <Text style={styles.specValue}>50ml</Text> */}
             </View>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Bảo hành</Text>
@@ -547,6 +701,15 @@ export default function ProductDetailScreen() {
         missingFields={validationResult.missingFields}
         message={createValidationMessage(validationResult)}
       />
+
+      <VariantSelector
+        visible={showVariantSelector}
+        onClose={() => setShowVariantSelector(false)}
+        product={product}
+        onVariantSelect={handleVariantSelect}
+        initialVariant={selectedVariant || undefined}
+        actionType={variantActionType}
+      />
     </View>
   );
 }
@@ -699,6 +862,33 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#FF6B7D",
     marginBottom: -10,
+  },
+  variantInfo: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  variantText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  changeVariantButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#fff5f5",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FFE5E5",
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  changeVariantText: {
+    fontSize: 14,
+    color: "#FF6B7D",
+    fontWeight: "600",
+    marginRight: 4,
   },
   ratingRow: {
     flexDirection: "row",

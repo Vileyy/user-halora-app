@@ -11,6 +11,12 @@ export type RootStackParamList = {
       description: string;
       image: string;
       category: string;
+      brandId?: string;
+      variants?: Array<{
+        price: number;
+        size: string;
+        stock: number;
+      }>;
     };
     productId?: string;
   };
@@ -30,6 +36,11 @@ export type RootStackParamList = {
       quantity: number;
       selectedSize?: string;
       selectedColor?: string;
+      selected?: boolean;
+      variant?: {
+        size: string;
+        price: number;
+      };
     }>;
     totalPrice: number;
   };

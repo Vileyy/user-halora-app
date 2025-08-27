@@ -29,6 +29,10 @@ interface OrderItem {
   price: string | number | undefined;
   image: string;
   quantity: number;
+  variant?: {
+    size: string;
+    price: number;
+  };
 }
 
 interface Order {
@@ -189,6 +193,11 @@ const OrderHistoryScreen = () => {
                 <Text style={styles.productName} numberOfLines={1}>
                   {product.name}
                 </Text>
+                {product.variant && (
+                  <Text style={styles.productVariant}>
+                    Dung tích: {product.variant.size}ml
+                  </Text>
+                )}
                 <View style={styles.productDetails}>
                   <Text style={styles.productPrice}>
                     {formatPrice(product.price)}
@@ -409,6 +418,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#333",
     marginBottom: 6,
+  },
+  productVariant: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "400",
+    marginBottom: 4,
   },
   productDetails: {
     flexDirection: "row",

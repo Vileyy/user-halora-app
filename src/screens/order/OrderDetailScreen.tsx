@@ -476,6 +476,11 @@ export default function OrderDetailScreen() {
                 <Text style={styles.productName} numberOfLines={2}>
                   {item.name}
                 </Text>
+                {item.variant && (
+                  <Text style={styles.productVariant}>
+                    Dung tích: {item.variant.size}ml
+                  </Text>
+                )}
                 <Text style={styles.productPrice}>
                   {MONEY(parseFloat(item.price))}
                 </Text>
@@ -1027,6 +1032,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#2c3e50",
+    marginBottom: 4,
+  },
+  productVariant: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "400",
     marginBottom: 4,
   },
   productPrice: {

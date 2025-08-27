@@ -16,6 +16,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const TIMER_DURATION = 2 * 60 * 60; // 2 giờ = 7200 giây
 const TIMER_STORAGE_KEY = "flash_deals_end_time";
 
+interface Variant {
+  price: number;
+  size: string;
+  stock: number;
+}
+
 interface FlashDealItem {
   id: string;
   name: string;
@@ -23,6 +29,8 @@ interface FlashDealItem {
   description: string;
   image: string;
   category: string;
+  brandId?: string;
+  variants?: Variant[];
 }
 
 const FlashDeals: React.FC = () => {
@@ -125,14 +133,23 @@ const FlashDeals: React.FC = () => {
     navigation.navigate("ProductDetailScreen", { product });
   };
 
+  // Hàm lấy giá hiển thị (ưu tiên variant đầu tiên)
+  const getDisplayPrice = (item: FlashDealItem): string => {
+    if (item.variants && item.variants.length > 0) {
+      return item.variants[0].price.toLocaleString();
+    }
+    return parseInt(item.price).toLocaleString();
+  };
+
   const renderItem = ({ item }: { item: FlashDealItem }) => (
     <TouchableOpacity style={styles.card} onPress={() => handlePress(item)}>
       <Image source={{ uri: item.image }} style={styles.image} />
       <View style={styles.infoContainer}>
         <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.price}>
-          {parseInt(item.price).toLocaleString()}₫
-        </Text>
+        <Text style={styles.price}>{getDisplayPrice(item)}₫</Text>
+        {/* {item.variants && item.variants.length > 0 && (
+          <Text style={styles.variantInfo}>{item.variants[0].size}ml</Text>
+        )} */}
         <Text style={styles.description} numberOfLines={2}>
           {item.description}
         </Text>
@@ -249,6 +266,13 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     textAlign: "left",
     height: 24,
+  },
+  variantInfo: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+    marginBottom: 4,
+    textAlign: "left",
   },
   description: {
     fontSize: 13,

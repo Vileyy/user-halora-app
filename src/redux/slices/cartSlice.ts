@@ -11,6 +11,10 @@ export interface CartItem {
   selectedSize?: string;
   selectedColor?: string;
   selected?: boolean;
+  variant?: {
+    size: string;
+    price: number;
+  };
 }
 
 // Type guard to ensure CartItem has valid data

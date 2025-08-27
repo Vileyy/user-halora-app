@@ -12,6 +12,12 @@ import { useNavigation, CommonActions } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types/navigation";
 
+interface Variant {
+  price: number;
+  size: string;
+  stock: number;
+}
+
 interface NewProductItem {
   id: string;
   name: string;
@@ -19,6 +25,8 @@ interface NewProductItem {
   description: string;
   image: string;
   category: string;
+  brandId?: string;
+  variants?: Variant[];
 }
 
 const NewProducts: React.FC = () => {
@@ -48,6 +56,14 @@ const NewProducts: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Hàm lấy giá hiển thị (ưu tiên variant đầu tiên)
+  const getDisplayPrice = (item: NewProductItem): string => {
+    if (item.variants && item.variants.length > 0) {
+      return item.variants[0].price.toLocaleString("vi-VN");
+    }
+    return parseInt(item.price).toLocaleString("vi-VN");
+  };
+
   const renderItem = ({ item }: { item: NewProductItem }) => (
     <TouchableOpacity
       style={styles.productContainer}
@@ -60,9 +76,7 @@ const NewProducts: React.FC = () => {
       <Text style={styles.productName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={styles.productPrice}>
-        {parseInt(item.price).toLocaleString("vi-VN")} VNĐ
-      </Text>
+      <Text style={styles.productPrice}>{getDisplayPrice(item)} VNĐ</Text>
       <Text style={styles.productDescription} numberOfLines={2}>
         {item.description}
       </Text>

@@ -49,6 +49,10 @@ type CartItem = {
   category?: string;
   selectedSize?: string;
   selectedColor?: string;
+  variant?: {
+    size: string;
+    price: number;
+  };
 };
 
 const MONEY = (n: number) => `${(n || 0).toLocaleString()}₫`;
@@ -170,6 +174,9 @@ export default function CheckoutScreen() {
                   if (item.selectedColor !== undefined) {
                     orderItem.selectedColor = item.selectedColor;
                   }
+                  if (item.variant !== undefined) {
+                    orderItem.variant = item.variant;
+                  }
 
                   return orderItem;
                 }),
@@ -232,6 +239,11 @@ export default function CheckoutScreen() {
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
+        {item.variant && (
+          <Text style={styles.productVariant}>
+            Dung tích: {item.variant.size}ml
+          </Text>
+        )}
         <Text style={styles.productPrice}>{MONEY(parseMoney(item.price))}</Text>
       </View>
       <Text style={styles.productQuantity}>x{item.quantity}</Text>
@@ -672,6 +684,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: "#FF6B7D",
+  },
+  productVariant: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+    marginTop: 2,
+    marginBottom: 2,
   },
   productQuantity: {
     fontSize: 14,
