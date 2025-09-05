@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -21,32 +22,23 @@ export interface Product {
   name: string;
   image: string;
   variants?: Variant[];
-  price?: string; // For backwards compatibility
+  price?: string;
 }
 
-interface VariantSelectorProps {
+interface VariantSelectionPopupProps {
   visible: boolean;
   onClose: () => void;
   product: Product;
-  onVariantSelect: (variant: Variant, quantity: number) => void;
-  initialVariant?: Variant;
-  actionType: "addToCart" | "buyNow";
+  onConfirm: (selectedVariant: Variant, quantity: number) => void;
 }
 
-const VariantSelector: React.FC<VariantSelectorProps> = ({
+const VariantSelectionPopup: React.FC<VariantSelectionPopupProps> = ({
   visible,
   onClose,
   product,
-  onVariantSelect,
-  initialVariant,
-  actionType,
+  onConfirm,
 }) => {
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
-    initialVariant ||
-      (product.variants && product.variants.length > 0
-        ? product.variants[0]
-        : null)
-  );
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   const handleQuantityChange = (change: number) => {
@@ -61,17 +53,28 @@ const VariantSelector: React.FC<VariantSelectorProps> = ({
   };
 
   const handleConfirm = () => {
-    if (selectedVariant) {
-      onVariantSelect(selectedVariant, quantity);
-      onClose();
+    if (!selectedVariant) {
+      Alert.alert(
+        "Chọn dung tích",
+        "Vui lòng chọn dung tích sản phẩm trước khi thêm vào giỏ hàng",
+        [
+          {
+            text: "OK",
+            style: "default",
+          },
+        ]
+      );
+      return;
     }
+
+    onConfirm(selectedVariant, quantity);
+    onClose();
   };
 
-  const getActionText = () => {
-    if (actionType === "addToCart") {
-      return `Thêm ${quantity} vào giỏ`;
-    }
-    return "Mua ngay";
+  const handleClose = () => {
+    setSelectedVariant(null);
+    setQuantity(1);
+    onClose();
   };
 
   if (!product.variants || product.variants.length === 0) {
@@ -83,13 +86,13 @@ const VariantSelector: React.FC<VariantSelectorProps> = ({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
             <Text style={styles.title}>Chọn dung tích</Text>
@@ -207,19 +210,14 @@ const VariantSelector: React.FC<VariantSelectorProps> = ({
           {/* Action Button */}
           <TouchableOpacity
             style={[
-              styles.actionButton,
-              !selectedVariant && styles.actionButtonDisabled,
-              actionType === "buyNow" && styles.buyNowButton,
+              styles.confirmButton,
+              !selectedVariant && styles.confirmButtonDisabled,
             ]}
             onPress={handleConfirm}
             disabled={!selectedVariant}
           >
-            <Ionicons
-              name={actionType === "addToCart" ? "cart" : "flash"}
-              size={20}
-              color="#fff"
-            />
-            <Text style={styles.actionButtonText}>{getActionText()}</Text>
+            <Ionicons name="cart" size={20} color="#fff" />
+            <Text style={styles.confirmButtonText}>Xác nhận thêm vào giỏ</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -383,28 +381,25 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FF6B7D",
   },
-  actionButton: {
+  confirmButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFA726",
+    backgroundColor: "#FF6B7D",
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
   },
-  buyNowButton: {
-    backgroundColor: "#FF6B7D",
-  },
-  actionButtonDisabled: {
+  confirmButtonDisabled: {
     backgroundColor: "#e0e0e0",
   },
-  actionButtonText: {
+  confirmButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
   },
 });
 
-export default VariantSelector;
+export default VariantSelectionPopup;

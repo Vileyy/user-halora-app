@@ -19,9 +19,10 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import Toast from "react-native-toast-message";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../types/navigation";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { getOrder, Order, cancelOrder } from "../../services/orderService";
+import { cancelOrderWithInventory } from "../../redux/slices/orderSlice";
 
 const { width } = Dimensions.get("window");
 
@@ -35,6 +36,7 @@ export default function OrderDetailScreen() {
   const route = useRoute<OrderDetailScreenRouteProp>();
   const { orderId } = route.params as { orderId: string };
   const user = useSelector((state: RootState) => state.auth.user);
+  const dispatch = useDispatch();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,7 +153,17 @@ export default function OrderDetailScreen() {
         throw new Error("Không có thông tin người dùng hoặc đơn hàng");
       }
 
-      await cancelOrder(user.uid, order.id);
+      // Use the new inventory-aware cancellation
+      const result = await dispatch(
+        cancelOrderWithInventory({
+          userId: user.uid,
+          orderId: order.id,
+        }) as any
+      );
+
+      if (cancelOrderWithInventory.rejected.match(result)) {
+        throw new Error(result.payload as string);
+      }
 
       // Cập nhật state local
       setOrder((prev) =>
@@ -167,6 +179,7 @@ export default function OrderDetailScreen() {
       setCancelModalVisible(false);
       Toast.show({
         text1: "Đã hủy đơn hàng thành công",
+        text2: "Tồn kho đã được hoàn lại",
         type: "success",
       });
     } catch (error) {

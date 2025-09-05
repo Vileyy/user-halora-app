@@ -20,8 +20,10 @@ import { RootStackParamList } from "../../types/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { clearCart, removeSelectedItems } from "../../redux/slices/cartSlice";
+import { placeOrderWithInventory } from "../../redux/slices/orderSlice";
 import {
   createOrder,
+  placeOrder,
   clearUserCart,
   removeItemsFromUserCart,
   getUserOrdersDebug,
@@ -193,7 +195,20 @@ export default function CheckoutScreen() {
                 "Creating order with data:",
                 JSON.stringify(orderData, null, 2)
               );
-              const orderId = await createOrder(user.uid, orderData);
+
+              // Use the new inventory-aware order placement
+              const result = await dispatch(
+                placeOrderWithInventory({
+                  userId: user.uid,
+                  orderData,
+                }) as any
+              );
+
+              if (placeOrderWithInventory.rejected.match(result)) {
+                throw new Error(result.payload as string);
+              }
+
+              const orderId = (result.payload as any).orderId;
               await getUserOrdersDebug(user.uid);
 
               const purchasedItemIds = selectedItems.map((item) => item.id);

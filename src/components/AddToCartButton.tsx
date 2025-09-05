@@ -48,7 +48,7 @@ const AddToCartButton: React.FC<AddToCartButtonProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       // Thêm sản phẩm vào giỏ hàng
-      addItemToCart(product);
+      addItemToCart({ ...product, quantity: 1 });
 
       // Hiển thị thông báo thành công
       Toast.show({

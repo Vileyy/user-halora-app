@@ -1,5 +1,5 @@
 import { database } from "./firebase";
-import { ref, push, set, get } from "firebase/database";
+import { ref, push, set, get, update, runTransaction } from "firebase/database";
 
 export interface OrderItem {
   id: string;
@@ -15,6 +15,18 @@ export interface OrderItem {
     size: string;
     price: number;
   };
+}
+
+export interface ProductVariant {
+  price: number;
+  size: string;
+  stockQty: number;
+}
+
+export interface InventoryUpdateResult {
+  success: boolean;
+  message: string;
+  availableStock?: number;
 }
 
 export interface Order {
@@ -57,6 +69,204 @@ const removeUndefinedValues = (obj: any): any => {
     }
   }
   return result;
+};
+
+/**
+ * Kiểm tra tồn kho của sản phẩm variant trước khi đặt hàng
+ */
+export const checkProductStock = async (
+  productId: string,
+  variantSize: string,
+  requestedQuantity: number
+): Promise<InventoryUpdateResult> => {
+  try {
+    const productRef = ref(database, `products/${productId}`);
+    const snapshot = await get(productRef);
+
+    if (!snapshot.exists()) {
+      return {
+        success: false,
+        message: "Sản phẩm không tồn tại",
+      };
+    }
+
+    const product = snapshot.val();
+    if (!product.variants || !Array.isArray(product.variants)) {
+      return {
+        success: false,
+        message: "Sản phẩm không có thông tin dung tích",
+      };
+    }
+
+    const variant = product.variants.find(
+      (v: ProductVariant) => v.size === variantSize
+    );
+    if (!variant) {
+      return {
+        success: false,
+        message: "Không tìm thấy dung tích được chọn",
+      };
+    }
+
+    if (variant.stockQty < requestedQuantity) {
+      return {
+        success: false,
+        message: "Sản phẩm không đủ tồn kho",
+        availableStock: variant.stockQty,
+      };
+    }
+
+    return {
+      success: true,
+      message: "Đủ tồn kho",
+      availableStock: variant.stockQty,
+    };
+  } catch (error) {
+    console.error("Error checking product stock:", error);
+    return {
+      success: false,
+      message: "Lỗi kiểm tra tồn kho",
+    };
+  }
+};
+
+/**
+ * Cập nhật tồn kho sản phẩm sử dụng Firebase Transaction để đảm bảo atomic operation
+ */
+export const updateProductStock = async (
+  productId: string,
+  variantSize: string,
+  quantityChange: number // âm để trừ, dương để cộng
+): Promise<InventoryUpdateResult> => {
+  try {
+    const productRef = ref(database, `products/${productId}`);
+
+    const result = await runTransaction(productRef, (currentData) => {
+      if (!currentData) {
+        throw new Error("Sản phẩm không tồn tại");
+      }
+
+      if (!currentData.variants || !Array.isArray(currentData.variants)) {
+        throw new Error("Sản phẩm không có thông tin dung tích");
+      }
+
+      const variantIndex = currentData.variants.findIndex(
+        (v: ProductVariant) => v.size === variantSize
+      );
+
+      if (variantIndex === -1) {
+        throw new Error("Không tìm thấy dung tích được chọn");
+      }
+
+      const currentStock = currentData.variants[variantIndex].stockQty || 0;
+      const newStock = currentStock + quantityChange;
+
+      if (newStock < 0) {
+        throw new Error(`Không đủ tồn kho. Còn lại: ${currentStock}`);
+      }
+
+      // Cập nhật stock
+      currentData.variants[variantIndex].stockQty = newStock;
+
+      return currentData;
+    });
+
+    if (result.committed) {
+      const updatedProduct = result.snapshot.val();
+      const variant = updatedProduct.variants.find(
+        (v: ProductVariant) => v.size === variantSize
+      );
+
+      console.log(
+        `✅ Stock updated for ${productId} (${variantSize}ml): ${variant.stockQty}`
+      );
+
+      return {
+        success: true,
+        message: "Cập nhật tồn kho thành công",
+        availableStock: variant.stockQty,
+      };
+    } else {
+      return {
+        success: false,
+        message: "Không thể cập nhật tồn kho do xung đột",
+      };
+    }
+  } catch (error) {
+    console.error("Error updating product stock:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Lỗi cập nhật tồn kho",
+    };
+  }
+};
+
+/**
+ * Đặt hàng mới với kiểm tra và trừ tồn kho
+ */
+export const placeOrder = async (
+  userId: string,
+  orderData: Omit<Order, "id" | "createdAt" | "updatedAt" | "status">
+): Promise<string> => {
+  try {
+    console.log("🛒 Starting place order with inventory management");
+
+    // Kiểm tra và trừ tồn kho cho từng item
+    const stockUpdates: Array<{
+      productId: string;
+      variantSize: string;
+      quantity: number;
+    }> = [];
+
+    for (const item of orderData.items) {
+      if (item.variant) {
+        // Kiểm tra tồn kho trước
+        const stockCheck = await checkProductStock(
+          item.id,
+          item.variant.size,
+          item.quantity
+        );
+
+        if (!stockCheck.success) {
+          throw new Error(`${item.name}: ${stockCheck.message}`);
+        }
+
+        // Trừ tồn kho
+        const updateResult = await updateProductStock(
+          item.id,
+          item.variant.size,
+          -item.quantity
+        );
+
+        if (!updateResult.success) {
+          // Hoàn lại tồn kho đã trừ nếu có lỗi
+          for (const update of stockUpdates) {
+            await updateProductStock(
+              update.productId,
+              update.variantSize,
+              update.quantity
+            );
+          }
+          throw new Error(`${item.name}: ${updateResult.message}`);
+        }
+
+        stockUpdates.push({
+          productId: item.id,
+          variantSize: item.variant.size,
+          quantity: item.quantity,
+        });
+      }
+    }
+
+    // Tạo order sau khi đã trừ tồn kho thành công
+    const orderId = await createOrder(userId, orderData);
+
+    console.log("🛒 Order placed successfully with inventory updated");
+    return orderId;
+  } catch (error) {
+    console.error("🛒 Error placing order:", error);
+    throw error;
+  }
 };
 
 /**
@@ -287,7 +497,7 @@ export const updateOrderStatus = async (
 };
 
 /**
- * Hủy đơn hàng - cập nhật trạng thái thành cancelled
+ * Hủy đơn hàng - cập nhật trạng thái thành cancelled và hoàn lại tồn kho
  * Path: users/{userId}/orders/{orderId}
  */
 export const cancelOrder = async (
@@ -295,7 +505,7 @@ export const cancelOrder = async (
   orderId: string
 ): Promise<void> => {
   try {
-    // console.log("🔥 Cancelling order:", orderId, "for user:", userId);
+    console.log("🔥 Cancelling order:", orderId, "for user:", userId);
 
     // Lấy thông tin đơn hàng hiện tại
     const orderRef = ref(database, `users/${userId}/orders/${orderId}`);
@@ -315,6 +525,29 @@ export const cancelOrder = async (
       throw new Error("Không thể hủy đơn hàng đang được xử lý hoặc đã giao");
     }
 
+    // Hoàn lại tồn kho cho từng item có variant
+    const restorePromises = currentOrder.items.map(async (item) => {
+      if (item.variant) {
+        console.log(
+          `🔄 Restoring stock for ${item.name} (${item.variant.size}ml): +${item.quantity}`
+        );
+        const restoreResult = await updateProductStock(
+          item.id,
+          item.variant.size,
+          item.quantity // cộng lại số lượng
+        );
+
+        if (!restoreResult.success) {
+          console.warn(
+            `⚠️ Failed to restore stock for ${item.name}: ${restoreResult.message}`
+          );
+        }
+      }
+    });
+
+    // Chờ tất cả việc hoàn kho hoàn thành
+    await Promise.all(restorePromises);
+
     // Cập nhật trạng thái thành cancelled
     const updatedOrder = {
       ...currentOrder,
@@ -323,7 +556,7 @@ export const cancelOrder = async (
     };
 
     await set(orderRef, updatedOrder);
-    // console.log("🔥 Order cancelled successfully");
+    console.log("🔥 Order cancelled successfully with inventory restored");
   } catch (error) {
     console.error("Error cancelling order:", error);
     if (error instanceof Error) {

@@ -234,7 +234,7 @@ export default function HomeScreen() {
                 },
                 timeSpent: {
                   ...prev.sessionBehavior.timeSpent,
-                  [product.id]: Date.now(), // Track when user viewed this product
+                  [product.id]: Date.now(), 
                 },
               },
             }));

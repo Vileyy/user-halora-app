@@ -35,6 +35,7 @@ import {
 import { SmartRecommendationContext, UserProfile } from "../../types/ai";
 import { getDatabase, ref, onValue } from "firebase/database";
 import VariantSelector, { Variant } from "../../components/VariantSelector";
+import VariantSelectionPopup from "../../components/VariantSelectionPopup";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -77,11 +78,21 @@ export default function ProductDetailScreen() {
   } | null>(null);
   const [showVariantSelector, setShowVariantSelector] =
     useState<boolean>(false);
+  const [showVariantSelectionPopup, setShowVariantSelectionPopup] =
+    useState<boolean>(false);
   const [variantActionType, setVariantActionType] = useState<
     "addToCart" | "buyNow"
   >("addToCart");
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
-    product.variants && product.variants.length > 0 ? product.variants[0] : null
+    product.variants && product.variants.length > 0
+      ? {
+          ...product.variants[0],
+          stockQty:
+            (product.variants[0] as any).stock ||
+            (product.variants[0] as any).stockQty ||
+            0,
+        }
+      : null
   );
 
   // AI Recommendation context
@@ -144,7 +155,6 @@ export default function ProductDetailScreen() {
   }, [product.brandId]);
 
   useEffect(() => {
-    // Track product view time for AI recommendations
     const startTime = Date.now();
 
     return () => {
@@ -236,13 +246,42 @@ export default function ProductDetailScreen() {
       return;
     }
 
-    // Nếu có variants, hiển thị variant selector
+    // Nếu có variants, hiển thị popup chọn variant
     if (product.variants && product.variants.length > 0) {
-      setVariantActionType("addToCart");
-      setShowVariantSelector(true);
+      setShowVariantSelectionPopup(true);
     } else {
       openQuantityModal();
     }
+  };
+
+  // Xử lý khi người dùng xác nhận chọn variant từ popup
+  const handleVariantConfirm = (variant: Variant, quantity: number) => {
+    setSelectedVariant(variant);
+
+    // Thêm vào giỏ hàng với variant đã chọn
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    addItemToCart({
+      id: product.id,
+      name: product.name,
+      price: variant.price.toString(),
+      description: product.description,
+      image: product.image,
+      category: product.category,
+      quantity: quantity,
+      variant: {
+        size: variant.size,
+        price: variant.price,
+      },
+    });
+
+    Toast.show({
+      type: "success",
+      text1: "Đã thêm vào giỏ hàng",
+      text2: `${product.name} (${variant.size}ml) x${quantity}`,
+      position: "top",
+      visibilityTime: 3000,
+      topOffset: 60,
+    });
   };
 
   // Xử lý khi người dùng chọn variant
@@ -448,7 +487,7 @@ export default function ProductDetailScreen() {
               <View style={styles.variantInfo}>
                 <Text style={styles.variantText}>
                   Dung tích: {selectedVariant.size}ml • Còn{" "}
-                  {selectedVariant.stock} sản phẩm
+                  {selectedVariant.stockQty} sản phẩm
                 </Text>
               </View>
             )}
@@ -469,7 +508,7 @@ export default function ProductDetailScreen() {
           </View>
 
           {/* Delivery Info */}
-          <View style={styles.deliverySection}>
+          <View style={styles.deliverySection}><div className=""></div>
             <View style={styles.deliveryRow}>
               <Ionicons name="location-outline" size={16} color="#666" />
               <Text style={styles.deliveryLabel}>Địa điểm chi nhánh:</Text>
@@ -705,10 +744,29 @@ export default function ProductDetailScreen() {
       <VariantSelector
         visible={showVariantSelector}
         onClose={() => setShowVariantSelector(false)}
-        product={product}
+        product={{
+          ...product,
+          variants: product.variants?.map((v) => ({
+            ...v,
+            stockQty: (v as any).stock || (v as any).stockQty || 0,
+          })),
+        }}
         onVariantSelect={handleVariantSelect}
         initialVariant={selectedVariant || undefined}
         actionType={variantActionType}
+      />
+
+      <VariantSelectionPopup
+        visible={showVariantSelectionPopup}
+        onClose={() => setShowVariantSelectionPopup(false)}
+        product={{
+          ...product,
+          variants: product.variants?.map((v) => ({
+            ...v,
+            stockQty: (v as any).stock || (v as any).stockQty || 0,
+          })),
+        }}
+        onConfirm={handleVariantConfirm}
       />
     </View>
   );
