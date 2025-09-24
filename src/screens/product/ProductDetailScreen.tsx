@@ -508,7 +508,7 @@ export default function ProductDetailScreen() {
           </View>
 
           {/* Delivery Info */}
-          <View style={styles.deliverySection}><div className=""></div>
+          <View style={styles.deliverySection}>
             <View style={styles.deliveryRow}>
               <Ionicons name="location-outline" size={16} color="#666" />
               <Text style={styles.deliveryLabel}>Địa điểm chi nhánh:</Text>

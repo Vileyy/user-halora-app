@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Alert,
   Image,
@@ -28,6 +28,7 @@ import {
   removeItemsFromUserCart,
   getUserOrdersDebug,
 } from "../../services/orderService";
+import voucherService, { VoucherData } from "../../services/voucherService";
 import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
 import {
   validateUserForOrder,
@@ -81,10 +82,32 @@ export default function CheckoutScreen() {
   // Coupon & phương thức
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [appliedShippingVoucher, setAppliedShippingVoucher] =
+    useState<VoucherData | null>(null);
+  const [appliedProductVoucher, setAppliedProductVoucher] =
+    useState<VoucherData | null>(null);
+  const [allVouchers, setAllVouchers] = useState<VoucherData[]>([]);
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
     "standard"
   );
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "momo">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "momo" | "stripe">(
+    "cod"
+  );
+
+  // Load vouchers
+  useEffect(() => {
+    const unsubscribe = voucherService.subscribeToVouchers(
+      (vouchers) => {
+        setAllVouchers(vouchers);
+      },
+      (error) => {
+        console.error("Error loading vouchers:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
   const itemsSubtotal = useMemo(() => {
     if (typeof totalPrice === "number") return totalPrice;
     return selectedItems.reduce(
@@ -99,15 +122,52 @@ export default function CheckoutScreen() {
   );
 
   const discountAmount = useMemo(() => {
+    // Xử lý product voucher từ VoucherService
+    if (appliedProductVoucher) {
+      return voucherService.calculateDiscount(
+        appliedProductVoucher,
+        itemsSubtotal,
+        0
+      );
+    }
+
+    // Fallback cho các voucher cũ (hardcoded)
     if (appliedCoupon === "HALORA10") return Math.round(itemsSubtotal * 0.1);
     if (appliedCoupon === "HALORA30K") return 30000;
     return 0;
-  }, [appliedCoupon, itemsSubtotal]);
+  }, [appliedProductVoucher, appliedCoupon, itemsSubtotal]);
+
+  const shippingDiscount = useMemo(() => {
+    // Xử lý voucher vận chuyển từ VoucherService
+    if (appliedShippingVoucher) {
+      const discount = voucherService.calculateDiscount(
+        appliedShippingVoucher,
+        itemsSubtotal,
+        baseShipping
+      );
+      // console.log("🚚 Shipping Voucher Debug:", {
+      //   voucherCode: appliedShippingVoucher.code,
+      //   discountType: appliedShippingVoucher.discountType,
+      //   discountValue: appliedShippingVoucher.discountValue,
+      //   baseShipping: baseShipping,
+      //   itemsSubtotal: itemsSubtotal,
+      //   calculatedDiscount: discount,
+      //   discountPercentage:
+      //     appliedShippingVoucher.discountType === "percentage"
+      //       ? `${appliedShippingVoucher.discountValue}%`
+      //       : "Fixed amount",
+      // });
+      return discount;
+    }
+
+    // Fallback cho voucher cũ
+    if (appliedCoupon === "FREESHIP") return baseShipping;
+    return 0;
+  }, [appliedShippingVoucher, appliedCoupon, baseShipping, itemsSubtotal]);
 
   const effectiveShipping = useMemo(() => {
-    if (appliedCoupon === "FREESHIP") return 0;
-    return baseShipping;
-  }, [appliedCoupon, baseShipping]);
+    return Math.max(0, baseShipping - shippingDiscount);
+  }, [baseShipping, shippingDiscount]);
 
   const finalTotal = useMemo(() => {
     const total = itemsSubtotal - discountAmount + effectiveShipping;
@@ -121,12 +181,37 @@ export default function CheckoutScreen() {
       Alert.alert("Lỗi", "Vui lòng nhập mã giảm giá");
       return;
     }
-    if (!["HALORA10", "HALORA30K", "FREESHIP"].includes(code)) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Không hợp lệ", "Mã giảm giá không tồn tại");
-      return;
+
+    // Tìm voucher trong danh sách
+    const voucher = allVouchers.find((v) => v.code === code);
+    if (voucher) {
+      const validation = voucherService.isVoucherValid(voucher, itemsSubtotal);
+      if (validation.valid) {
+        // Clear old vouchers
+        setAppliedShippingVoucher(null);
+        setAppliedProductVoucher(null);
+        setAppliedCoupon(null);
+
+        // Apply new voucher
+        if (voucher.type === "shipping") {
+          setAppliedShippingVoucher(voucher);
+        } else {
+          setAppliedProductVoucher(voucher);
+        }
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Alert.alert("Thành công", `Đã áp dụng voucher ${code}`);
+        return;
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Voucher không hợp lệ", validation.reason);
+        return;
+      }
     }
+
     setAppliedCoupon(code);
+    setAppliedShippingVoucher(null);
+    setAppliedProductVoucher(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert("Thành công", `Đã áp dụng mã ${code}`);
   };
@@ -137,7 +222,7 @@ export default function CheckoutScreen() {
       return;
     }
 
-    // Kiểm tra thông tin người dùng
+    // Check user info
     const validation = validateUserForOrder(user);
     if (!validation.isValid) {
       setValidationResult(validation);
@@ -149,16 +234,36 @@ export default function CheckoutScreen() {
     Alert.alert(
       "Xác nhận đặt hàng",
       `Tổng tiền: ${MONEY(finalTotal)}\nThanh toán: ${
-        paymentMethod === "cod" ? "COD" : "MoMo"
+        paymentMethod === "cod"
+          ? "COD"
+          : paymentMethod === "momo"
+          ? "MoMo"
+          : "Stripe"
       }`,
       [
         { text: "Hủy", style: "cancel" },
         {
           text: "Đặt hàng",
           onPress: async () => {
+            // Nếu chọn Stripe, chuyển đến màn hình thanh toán Stripe
+            if (paymentMethod === "stripe") {
+              navigation.navigate("StripePaymentScreen", {
+                selectedItems,
+                totalPrice: finalTotal,
+                itemsSubtotal,
+                discountAmount,
+                effectiveShipping,
+                shippingMethod,
+                appliedCoupon: appliedCoupon || null,
+                appliedShippingVoucher,
+                appliedProductVoucher,
+              });
+              return;
+            }
+
             setIsPlacingOrder(true);
             try {
-              // Tạo order data
+              // Create order data
               const orderData = {
                 items: selectedItems.map((item) => {
                   const orderItem: any = {
@@ -305,9 +410,48 @@ export default function CheckoutScreen() {
             onPress={() => {
               navigation.navigate("VoucherScreen", {
                 currentTotal: itemsSubtotal,
-                onVoucherSelect: (voucherCode: string) => {
-                  setCouponCode(voucherCode);
-                  setAppliedCoupon(voucherCode);
+                onVoucherSelect: (vouchers: {
+                  shippingVoucher?: string;
+                  productVoucher?: string;
+                }) => {
+                  setAppliedShippingVoucher(null);
+                  setAppliedProductVoucher(null);
+                  setAppliedCoupon(null);
+
+                  if (vouchers.shippingVoucher) {
+                    const shippingVoucher = allVouchers.find(
+                      (v) => v.code === vouchers.shippingVoucher
+                    );
+                    if (shippingVoucher) {
+                      const validation = voucherService.isVoucherValid(
+                        shippingVoucher,
+                        itemsSubtotal
+                      );
+                      if (validation.valid) {
+                        setAppliedShippingVoucher(shippingVoucher);
+                        setCouponCode(shippingVoucher.code);
+                      }
+                    }
+                  }
+
+                  // Handle product voucher
+                  if (vouchers.productVoucher) {
+                    const productVoucher = allVouchers.find(
+                      (v) => v.code === vouchers.productVoucher
+                    );
+                    if (productVoucher) {
+                      const validation = voucherService.isVoucherValid(
+                        productVoucher,
+                        itemsSubtotal
+                      );
+                      if (validation.valid) {
+                        setAppliedProductVoucher(productVoucher);
+                        if (!vouchers.shippingVoucher) {
+                          setCouponCode(productVoucher.code);
+                        }
+                      }
+                    }
+                  }
                 },
               });
             }}
@@ -324,7 +468,7 @@ export default function CheckoutScreen() {
               <Ionicons name="pricetag-outline" size={20} color="#666" />
               <TextInput
                 style={styles.couponInput}
-                placeholder="Nhập HALORA10 / HALORA30K / FREESHIP"
+                placeholder="Vui lòng chọn Voucher có sẵn"
                 value={couponCode}
                 onChangeText={setCouponCode}
                 placeholderTextColor="#999"
@@ -460,6 +604,34 @@ export default function CheckoutScreen() {
               )}
             </View>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              paymentMethod === "stripe" && styles.paymentOptionSelected,
+            ]}
+            onPress={() => {
+              setPaymentMethod("stripe");
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+          >
+            <View style={styles.paymentOptionLeft}>
+              <Ionicons name="card-outline" size={20} color="#666" />
+              <Text style={styles.paymentOptionTitle}>
+                Thẻ tín dụng/ghi nợ (Stripe)
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.radioButton,
+                paymentMethod === "stripe" && styles.radioButtonSelected,
+              ]}
+            >
+              {paymentMethod === "stripe" && (
+                <View style={styles.radioButtonInner} />
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* --- TÓM TẮT CHI PHÍ --- */}
@@ -481,6 +653,16 @@ export default function CheckoutScreen() {
             </Text>
           </View>
 
+          {/* Hiển thị giảm phí vận chuyển nếu có */}
+          {shippingDiscount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Giảm phí vận chuyển</Text>
+              <Text style={[styles.summaryValue, styles.negativeValue]}>
+                -{MONEY(shippingDiscount)}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
             <Text style={styles.summaryValue}>{MONEY(effectiveShipping)}</Text>
@@ -493,22 +675,58 @@ export default function CheckoutScreen() {
             <Text style={styles.summaryTotalValue}>{MONEY(finalTotal)}</Text>
           </View>
 
-          {appliedCoupon === "FREESHIP" && (
+          {/* Hiển thị thông tin voucher đã áp dụng */}
+          {appliedShippingVoucher && (
             <Text style={styles.summaryHint}>
-              Đã áp dụng <Text style={{ fontWeight: "700" }}>FREESHIP</Text> —
-              miễn phí vận chuyển
+              🚚 Đã áp dụng{" "}
+              <Text style={{ fontWeight: "700" }}>
+                {appliedShippingVoucher.code}
+              </Text>{" "}
+              — Giảm{" "}
+              {appliedShippingVoucher.discountType === "percentage"
+                ? `${appliedShippingVoucher.discountValue}%`
+                : `${appliedShippingVoucher.discountValue.toLocaleString()}₫`}{" "}
+              phí vận chuyển
             </Text>
           )}
-          {appliedCoupon === "HALORA10" && (
+
+          {appliedProductVoucher && (
             <Text style={styles.summaryHint}>
-              Giảm 10% trên tiền hàng (HALORA10)
+              🎁 Đã áp dụng{" "}
+              <Text style={{ fontWeight: "700" }}>
+                {appliedProductVoucher.code}
+              </Text>{" "}
+              — Giảm{" "}
+              {appliedProductVoucher.discountType === "percentage"
+                ? `${appliedProductVoucher.discountValue}%`
+                : `${appliedProductVoucher.discountValue.toLocaleString()}₫`}{" "}
+              trên tiền hàng
             </Text>
           )}
-          {appliedCoupon === "HALORA30K" && (
-            <Text style={styles.summaryHint}>
-              Giảm trực tiếp 30.000₫ (HALORA30K)
-            </Text>
-          )}
+
+          {/* Fallback cho voucher cũ */}
+          {!appliedShippingVoucher &&
+            !appliedProductVoucher &&
+            appliedCoupon === "FREESHIP" && (
+              <Text style={styles.summaryHint}>
+                Đã áp dụng <Text style={{ fontWeight: "700" }}>FREESHIP</Text> —
+                miễn phí vận chuyển
+              </Text>
+            )}
+          {!appliedShippingVoucher &&
+            !appliedProductVoucher &&
+            appliedCoupon === "HALORA10" && (
+              <Text style={styles.summaryHint}>
+                Giảm 10% trên tiền hàng (HALORA10)
+              </Text>
+            )}
+          {!appliedShippingVoucher &&
+            !appliedProductVoucher &&
+            appliedCoupon === "HALORA30K" && (
+              <Text style={styles.summaryHint}>
+                Giảm trực tiếp 30.000₫ (HALORA30K)
+              </Text>
+            )}
         </View>
 
         <View style={{ height: 120 }} />
@@ -729,7 +947,7 @@ const styles = StyleSheet.create({
   couponInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 10,
+    fontSize: 12,
     color: "#1a1a1a",
   },
   applyButton: {

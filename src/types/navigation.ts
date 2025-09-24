@@ -44,6 +44,31 @@ export type RootStackParamList = {
     }>;
     totalPrice: number;
   };
+  StripePaymentScreen: {
+    selectedItems: Array<{
+      id: string;
+      name: string;
+      price: string | number;
+      description?: string;
+      image: string;
+      category?: string;
+      quantity: number;
+      selectedSize?: string;
+      selectedColor?: string;
+      variant?: {
+        size: string;
+        price: number;
+      };
+    }>;
+    totalPrice: number;
+    itemsSubtotal: number;
+    discountAmount: number;
+    effectiveShipping: number;
+    shippingMethod: string;
+    appliedCoupon: string | null;
+    appliedShippingVoucher: any;
+    appliedProductVoucher: any;
+  };
   OrderSuccessScreen: undefined;
   OrderDetailScreen: { orderId: string };
   OrderTrackingScreen: { orderId: string };
@@ -53,7 +78,10 @@ export type RootStackParamList = {
   OrderHistoryScreen: undefined;
   VoucherScreen: {
     currentTotal?: number;
-    onVoucherSelect?: (voucherCode: string) => void;
+    onVoucherSelect?: (vouchers: {
+      shippingVoucher?: string;
+      productVoucher?: string;
+    }) => void;
   };
   ReviewScreen: {
     orderId: string;

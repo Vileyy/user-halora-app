@@ -5,6 +5,7 @@ import rootReducer from "./src/redux/reducers/rootReducer";
 import AppNavigator from "./src/navigation";
 import Toast from "react-native-toast-message";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StripeProvider } from "@stripe/stripe-react-native";
 
 const store = configureStore({
   reducer: rootReducer,
@@ -13,10 +14,16 @@ const store = configureStore({
 export default function App() {
   return (
     <Provider store={store}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <AppNavigator />
-        <Toast />
-      </SafeAreaView>
+      <StripeProvider
+        publishableKey={
+          process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        }
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <AppNavigator />
+          <Toast />
+        </SafeAreaView>
+      </StripeProvider>
     </Provider>
   );
 }

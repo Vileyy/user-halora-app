@@ -37,7 +37,7 @@ export interface Order {
   shippingCost: number;
   totalAmount: number;
   shippingMethod: "standard" | "express";
-  paymentMethod: "cod" | "momo";
+  paymentMethod: "cod" | "momo" | "stripe";
   appliedCoupon?: string | null;
   status:
     | "pending"

@@ -9,6 +9,7 @@ import ProductDetailScreen from "../screens/product/ProductDetailScreen";
 import ViewAllScreen from "../screens/viewall/ViewAllScreen ";
 import CartScreen from "../screens/cart/CartScreen";
 import CheckoutScreen from "../screens/checkout/CheckoutScreen";
+import StripePaymentScreen from "../screens/payment/StripePaymentScreen";
 import OrderSuccessScreen from "../screens/order/OrderSuccessScreen";
 import OrderDetailScreen from "../screens/order/OrderDetailScreen";
 import OrderTrackingScreen from "../screens/order/OrderTrackingScreen";
@@ -63,6 +64,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="CheckoutScreen"
           component={CheckoutScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="StripePaymentScreen"
+          component={StripePaymentScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
