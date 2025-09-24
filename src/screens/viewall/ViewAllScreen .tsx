@@ -29,10 +29,17 @@ type ViewAllScreenNavigationProp = StackNavigationProp<
 interface Product {
   id: string;
   name: string;
-  price: string;
+  price?: string;
   description: string;
   image: string;
   category: string;
+  brandId?: string;
+  variants?: Array<{
+    price: number;
+    size: string;
+    stockQty: number;
+    sku?: string;
+  }>;
 }
 
 type SortOption =
@@ -129,7 +136,7 @@ export default function ViewAllScreen() {
         // Animate each item with fade in down effect
         animations.forEach((anim, index) => {
           Animated.sequence([
-            Animated.delay(index * 120), 
+            Animated.delay(index * 120),
             Animated.parallel([
               Animated.timing(anim, {
                 toValue: 1,
@@ -148,7 +155,7 @@ export default function ViewAllScreen() {
   useEffect(() => {
     Animated.spring(sortOptionsHeight, {
       toValue: showSortOptions ? 250 : 0,
-      useNativeDriver: false, 
+      useNativeDriver: false,
     }).start();
   }, [showSortOptions]);
 
@@ -249,10 +256,18 @@ export default function ViewAllScreen() {
         result.sort((a, b) => b.name.localeCompare(a.name));
         break;
       case "price_asc":
-        result.sort((a, b) => parseInt(a.price) - parseInt(b.price));
+        result.sort((a, b) => {
+          const priceA = getProductPrice(a);
+          const priceB = getProductPrice(b);
+          return priceA - priceB;
+        });
         break;
       case "price_desc":
-        result.sort((a, b) => parseInt(b.price) - parseInt(a.price));
+        result.sort((a, b) => {
+          const priceA = getProductPrice(a);
+          const priceB = getProductPrice(b);
+          return priceB - priceA;
+        });
         break;
       default:
         // Keep original order
@@ -263,7 +278,18 @@ export default function ViewAllScreen() {
   }, [products, searchText, sortOption]);
 
   const handleProductPress = (product: Product) => {
-    navigation.navigate("ProductDetailScreen", { product });
+    // Convert Product to navigation-compatible format
+    const navProduct = {
+      id: product.id,
+      name: product.name,
+      price: product.price || "",
+      description: product.description,
+      image: product.image,
+      category: product.category,
+      brandId: product.brandId,
+      variants: product.variants,
+    };
+    navigation.navigate("ProductDetailScreen", { product: navProduct });
   };
 
   const handleSortOption = (option: SortOption) => {
@@ -300,7 +326,39 @@ export default function ViewAllScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-    navigation.navigate("ProductDetailScreen", { product });
+    // Convert Product to navigation-compatible format
+    const navProduct = {
+      id: product.id,
+      name: product.name,
+      price: product.price || "",
+      description: product.description,
+      image: product.image,
+      category: product.category,
+      brandId: product.brandId,
+      variants: product.variants,
+    };
+    navigation.navigate("ProductDetailScreen", { product: navProduct });
+  };
+
+  const getProductPrice = (product: Product): number => {
+    // Nếu có price trực tiếp
+    if (product.price) {
+      const priceStr = product.price.toString();
+      const priceNumber = parseInt(priceStr.replace(/[^\d]/g, ""));
+      return isNaN(priceNumber) ? 0 : priceNumber;
+    }
+
+    // Nếu có variants, lấy giá thấp nhất
+    if (product.variants && product.variants.length > 0) {
+      return Math.min(...product.variants.map((v) => v.price));
+    }
+
+    return 0;
+  };
+
+  const formatPrice = (product: Product): string => {
+    const price = getProductPrice(product);
+    return `${price.toLocaleString()}₫`;
   };
 
   const getSortOptionText = (option: SortOption) => {
@@ -354,9 +412,7 @@ export default function ViewAllScreen() {
             <Text style={styles.productName} numberOfLines={2}>
               {item.name}
             </Text>
-            <Text style={styles.productPrice}>
-              {parseInt(item.price).toLocaleString()}₫
-            </Text>
+            <Text style={styles.productPrice}>{formatPrice(item)}</Text>
             <Text style={styles.productDescription} numberOfLines={2}>
               {item.description}
             </Text>
@@ -628,6 +684,9 @@ export default function ViewAllScreen() {
             contentContainerStyle={styles.productsList}
             showsVerticalScrollIndicator={false}
             columnWrapperStyle={styles.row}
+            bounces={true}
+            alwaysBounceVertical={false}
+            keyboardShouldPersistTaps="handled"
           />
         </Animated.View>
       )}
@@ -749,6 +808,7 @@ const styles = StyleSheet.create({
   },
   productsList: {
     padding: 16,
+    paddingBottom: 185, 
   },
   row: {
     justifyContent: "space-between",

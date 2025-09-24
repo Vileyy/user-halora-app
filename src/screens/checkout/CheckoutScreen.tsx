@@ -35,6 +35,8 @@ import {
   createValidationMessage,
   ValidationResult,
 } from "../../utils/userValidation";
+import { stripeService } from "../../services/stripeService";
+import { useStripe, StripeProvider } from "@stripe/stripe-react-native";
 
 type CheckoutScreenRouteProp = RouteProp<RootStackParamList, "CheckoutScreen">;
 type CheckoutScreenNavigationProp = StackNavigationProp<
@@ -62,11 +64,12 @@ const MONEY = (n: number) => `${(n || 0).toLocaleString()}₫`;
 const parseMoney = (v: string | number) =>
   typeof v === "number" ? v : parseInt(String(v).replace(/[^\d]/g, "")) || 0;
 
-export default function CheckoutScreen() {
+function CheckoutContent() {
   const navigation = useNavigation<CheckoutScreenNavigationProp>();
   const route = useRoute<CheckoutScreenRouteProp>();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [showUserInfoModal, setShowUserInfoModal] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult>({
@@ -174,6 +177,132 @@ export default function CheckoutScreen() {
     return total > 0 ? total : 0;
   }, [itemsSubtotal, discountAmount, effectiveShipping]);
 
+  // Create Stripe Payment Intent
+  const createStripePaymentIntent = async (amount: number) => {
+    try {
+      const clientSecret = await stripeService.createPaymentIntent(amount);
+      return clientSecret;
+    } catch (error) {
+      console.error("Error creating payment intent:", error);
+      Alert.alert("Lỗi", "Không thể khởi tạo thanh toán Stripe");
+      return null;
+    }
+  };
+
+  // Handle Stripe Payment
+  const handleStripePayment = async (clientSecret: string) => {
+    try {
+      // Initialize Payment Sheet
+      const init = await initPaymentSheet({
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: "Halora Cosmetics",
+        customerId: user?.uid,
+        defaultBillingDetails: {
+          name: user?.displayName || "Customer",
+          email: user?.email || "",
+        },
+      });
+
+      if (init.error) {
+        console.error("Payment sheet init error:", init.error);
+        Alert.alert("Lỗi", init.error.message);
+        return;
+      }
+
+      // Present Payment Sheet
+      const result = await presentPaymentSheet();
+
+      if (result.error) {
+        console.error("Payment sheet error:", result.error);
+        Alert.alert("Thanh toán thất bại", result.error.message);
+        return;
+      }
+
+      // Payment succeeded - create order
+      if (!result.error) {
+        await createStripeOrder();
+      }
+    } catch (error) {
+      console.error("Stripe payment error:", error);
+      Alert.alert("Lỗi", "Có lỗi xảy ra khi xử lý thanh toán");
+    }
+  };
+
+  // Create order after successful Stripe payment
+  const createStripeOrder = async () => {
+    setIsPlacingOrder(true);
+    try {
+      const orderData = {
+        items: selectedItems.map((item) => {
+          const orderItem: any = {
+            id: item.id,
+            name: item.name,
+            price: item.price.toString(),
+            description: item.description || "",
+            image: item.image,
+            category: item.category || "Other",
+            quantity: item.quantity,
+          };
+          if (item.selectedSize !== undefined) {
+            orderItem.selectedSize = item.selectedSize;
+          }
+          if (item.selectedColor !== undefined) {
+            orderItem.selectedColor = item.selectedColor;
+          }
+          if (item.variant !== undefined) {
+            orderItem.variant = item.variant;
+          }
+          return orderItem;
+        }),
+        itemsSubtotal,
+        discountAmount,
+        shippingCost: effectiveShipping,
+        totalAmount: finalTotal,
+        shippingMethod: shippingMethod as "standard" | "express",
+        paymentMethod: "stripe" as const,
+        appliedCoupon: appliedCoupon || null,
+      };
+
+      const result = await dispatch(
+        placeOrderWithInventory({
+          userId: user!.uid,
+          orderData,
+        }) as any
+      );
+
+      if (placeOrderWithInventory.rejected.match(result)) {
+        throw new Error(result.payload as string);
+      }
+
+      const orderId = (result.payload as any).orderId;
+      await getUserOrdersDebug(user!.uid);
+
+      const purchasedItemIds = selectedItems.map((item) => item.id);
+      try {
+        await removeItemsFromUserCart(user!.uid, purchasedItemIds);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        dispatch(removeSelectedItems(purchasedItemIds));
+      } catch (cartError) {
+        console.error("Error removing items from cart:", cartError);
+        Alert.alert(
+          "Thông báo",
+          "Đơn hàng đã được tạo thành công nhưng có lỗi khi cập nhật giỏ hàng. Vui lòng kiểm tra lại giỏ hàng."
+        );
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      (navigation as any).navigate("OrderSuccessScreen", {
+        orderId,
+        totalAmount: finalTotal,
+      });
+    } catch (error) {
+      console.error("Error creating order:", error);
+      Alert.alert("Lỗi", "Có lỗi xảy ra khi tạo đơn hàng");
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
   // Apply coupon
   const handleApplyCoupon = () => {
     const code = couponCode.trim().toUpperCase();
@@ -245,19 +374,12 @@ export default function CheckoutScreen() {
         {
           text: "Đặt hàng",
           onPress: async () => {
-            // Nếu chọn Stripe, chuyển đến màn hình thanh toán Stripe
+            // Nếu chọn Stripe, tạo Payment Intent và mở Payment Sheet
             if (paymentMethod === "stripe") {
-              navigation.navigate("StripePaymentScreen", {
-                selectedItems,
-                totalPrice: finalTotal,
-                itemsSubtotal,
-                discountAmount,
-                effectiveShipping,
-                shippingMethod,
-                appliedCoupon: appliedCoupon || null,
-                appliedShippingVoucher,
-                appliedProductVoucher,
-              });
+              const clientSecret = await createStripePaymentIntent(finalTotal);
+              if (clientSecret) {
+                await handleStripePayment(clientSecret);
+              }
               return;
             }
 
@@ -1165,3 +1287,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+export default function CheckoutScreen() {
+  return (
+    <StripeProvider
+      publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY!}
+    >
+      <CheckoutContent />
+    </StripeProvider>
+  );
+}

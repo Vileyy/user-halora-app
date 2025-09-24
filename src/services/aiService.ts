@@ -56,7 +56,7 @@ class AIService {
 
     if (timeSinceLastRequest < this.minRequestInterval) {
       const waitTime = this.minRequestInterval - timeSinceLastRequest;
-      console.log(`⏳ Rate limit: waiting ${waitTime}ms...`);
+      // console.log(`⏳ Rate limit: waiting ${waitTime}ms...`);
       await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
 
@@ -221,12 +221,12 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
         (product) => !excludedIds.has(product.id)
       );
 
-      console.log("🔍 Generating recommendations:", {
-        totalProducts: currentProducts.length,
-        availableAfterFilter: availableProducts.length,
-        excludedCount: excludedIds.size,
-        purchaseHistory: userBehavior.purchaseHistory?.slice(0, 3),
-      });
+      // console.log("🔍 Generating recommendations:", {
+      //   totalProducts: currentProducts.length,
+      //   availableAfterFilter: availableProducts.length,
+      //   excludedCount: excludedIds.size,
+      //   purchaseHistory: userBehavior.purchaseHistory?.slice(0, 3),
+      // });
 
       // Tạo recommendations dựa trên lịch sử mua hàng
       let recommendations = this.getRecommendationsBasedOnPurchaseHistory(
@@ -276,9 +276,9 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
 
       // Nếu vẫn chưa có gì (user mới hoàn toàn), tạo popular recommendations
       if (recommendations.length === 0 && availableProducts.length > 0) {
-        console.log(
-          "🆕 New user detected, generating popular product recommendations"
-        );
+        // console.log(
+        //   "🆕 New user detected, generating popular product recommendations"
+        // );
         recommendations =
           this.getPopularProductRecommendations(availableProducts);
       }
@@ -342,11 +342,11 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
     const config = AI_API_CONFIG.gemini;
 
     // Debug logs
-    console.log("🔧 Gemini API Config:", {
-      apiKey: config.apiKey.substring(0, 10) + "...",
-      model: config.model,
-      baseURL: config.baseURL,
-    });
+    // console.log("🔧 Gemini API Config:", {
+    //   apiKey: config.apiKey.substring(0, 10) + "...",
+    //   model: config.model,
+    //   baseURL: config.baseURL,
+    // });
 
     // use the most stable endpoint
     const endpoints = [
@@ -388,7 +388,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
     for (const endpoint of endpoints) {
       try {
         const url = `${endpoint.baseURL}/models/${endpoint.model}:generateContent?key=${config.apiKey}`;
-        console.log("🔗 Trying URL:", url);
+        // console.log("🔗 Trying URL:", url);
 
         const response = await axios.post(url, payload, {
           headers: {
@@ -398,7 +398,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
         });
 
         const advice = response.data.candidates[0].content.parts[0].text;
-        console.log("✅ Gemini API Success with:", endpoint.model);
+        // console.log("✅ Gemini API Success with:", endpoint.model);
 
         return {
           advice,
@@ -407,23 +407,23 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
         };
       } catch (error: any) {
         const status = error.response?.status;
-        console.log(
-          `❌ Failed with ${endpoint.model}:`,
-          status || error.message
-        );
+        // console.log(
+        //   `❌ Failed with ${endpoint.model}:`,
+        //   status || error.message
+        // );
 
         if (status === 429) {
-          console.log("⚠️ Rate limit exceeded, will use offline advice");
+          // console.log("⚠️ Rate limit exceeded, will use offline advice");
           break;
         } else if (status === 403) {
-          console.log("⚠️ API key invalid, will use offline advice");
+          // console.log("⚠️ API key invalid, will use offline advice");
           break;
         } else if (status === 404) {
-          console.log("❌ Endpoint không tồn tại, thử endpoint khác...");
+          // console.log("❌ Endpoint không tồn tại, thử endpoint khác...");
           continue;
         }
 
-        console.log(`⚠️ API Error ${status}, will use offline advice`);
+        // console.log(`⚠️ API Error ${status}, will use offline advice`);
         break;
       }
     }
@@ -605,7 +605,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
   ): ProductRecommendation[] {
     if (!products || products.length === 0) return [];
 
-    console.log("🌟 Creating popular product recommendations for new user");
+    // console.log("🌟 Creating popular product recommendations for new user");
 
     // Phân loại sản phẩm theo category
     const productsByCategory = products.reduce((acc: any, product: any) => {
@@ -691,9 +691,9 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
       }
     }
 
-    console.log(
-      `🌟 Generated ${recommendations.length} popular recommendations`
-    );
+    // console.log(
+    //   `🌟 Generated ${recommendations.length} popular recommendations`
+    // );
     return recommendations;
   }
 
@@ -910,10 +910,10 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
       .filter(Boolean)
       .slice(0, 3); // Chỉ xem 3 sản phẩm gần nhất
 
-    console.log(
-      "📦 Purchased products for analysis:",
-      purchasedProducts.map((p) => p?.name)
-    );
+    // console.log(
+    //   "📦 Purchased products for analysis:",
+    //   purchasedProducts.map((p) => p?.name)
+    // );
 
     for (const purchasedProduct of purchasedProducts) {
       if (!purchasedProduct) continue;
@@ -1288,7 +1288,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
    */
   resetRateLimit() {
     this.lastRequestTime = 0;
-    console.log("🔄 Rate limit timer reset for new API key");
+    // console.log("🔄 Rate limit timer reset for new API key");
   }
 
   /**

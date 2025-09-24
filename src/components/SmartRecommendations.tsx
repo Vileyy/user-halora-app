@@ -51,8 +51,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
     context.userId,
     context.currentProduct,
     currentProducts.length,
-    context.purchaseHistory?.length, 
-    context.recentlyViewed?.length, 
+    context.purchaseHistory?.length,
+    context.recentlyViewed?.length,
     JSON.stringify(context.purchaseHistory?.slice(0, 3)),
   ]);
 
@@ -60,21 +60,21 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
   useEffect(() => {
     const autoRefreshInterval = setInterval(() => {
       if (!loading && recommendations.length > 0) {
-        setShownRecommendations([]); 
+        setShownRecommendations([]);
         loadRecommendations();
       }
-    }, 1 * 60 * 1000); 
+    }, 1 * 60 * 1000);
 
     return () => clearInterval(autoRefreshInterval);
   }, [loading, recommendations.length]);
 
   const loadRecommendations = async () => {
     if (!context.userId || currentProducts.length === 0) {
-      console.log("⏳ Waiting for user ID and products to load...");
+      // console.log("⏳ Waiting for user ID and products to load...");
       return;
     }
 
-    console.log("🚀 Starting recommendations load for user:", context.userId);
+    // console.log("🚀 Starting recommendations load for user:", context.userId);
     setLoading(true);
     setError(null);
 
@@ -86,12 +86,12 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
         searchHistory: context.searchHistory,
       };
 
-      console.log("🎯 Loading recommendations with context:", {
-        userId: context.userId,
-        purchaseHistory: context.purchaseHistory?.slice(0, 3),
-        recentlyViewed: context.recentlyViewed?.slice(0, 3),
-        shownRecommendations: shownRecommendations.slice(0, 3),
-      });
+      // console.log("🎯 Loading recommendations with context:", {
+      //   userId: context.userId,
+      //   purchaseHistory: context.purchaseHistory?.slice(0, 3),
+      //   recentlyViewed: context.recentlyViewed?.slice(0, 3),
+      //   shownRecommendations: shownRecommendations.slice(0, 3),
+      // });
 
       const recs = await aiService.getSmartRecommendations(
         context.userId,
@@ -115,7 +115,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
   };
 
   const handleRefresh = () => {
-    console.log("🔄 Manual refresh triggered");
+    // console.log("🔄 Manual refresh triggered");
     // Reset shown recommendations to see the new products
     setShownRecommendations([]);
     loadRecommendations();

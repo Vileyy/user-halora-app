@@ -129,19 +129,19 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
             // Sign out from Google
             try {
               await GoogleSignin.signOut();
-              console.log("✅ Google session cleared");
+              // console.log("✅ Google session cleared");
             } catch (googleSignOutError) {
-              console.log(
-                "Google sign out error (can be ignored):",
-                googleSignOutError
-              );
+              // console.log(
+              //   "Google sign out error (can be ignored):",
+              //   googleSignOutError
+              // );
             }
 
             // Clear Redux state
             dispatch(clearUser());
             dispatch(clearCart());
             dispatch(clearFavorites());
-            console.log("✅ Redux state cleared");
+            // console.log("✅ Redux state cleared");
 
             // Clear AsyncStorage
             await AsyncStorage.multiRemove([
@@ -150,7 +150,7 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
               "userEmail",
               "isLoggedIn",
             ]);
-            console.log("✅ AsyncStorage cleared");
+            // console.log("✅ AsyncStorage cleared");
 
             // Navigate to login screen and reset navigation stack
             navigation.reset({

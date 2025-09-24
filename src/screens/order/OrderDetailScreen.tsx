@@ -447,6 +447,8 @@ export default function OrderDetailScreen() {
               <Text style={styles.infoValue}>
                 {order.paymentMethod === "cod"
                   ? "Thanh toán khi nhận hàng"
+                  : order.paymentMethod === "stripe"
+                  ? "Thẻ tín dụng/ghi nợ (Stripe)"
                   : "Ví MoMo"}
               </Text>
             </View>

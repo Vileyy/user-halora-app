@@ -162,9 +162,9 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
           // Reload summary sau khi debug fix
           const updatedSummary = await getProductReviewSummary(productId);
           setSummary(updatedSummary);
-          console.log("✅ Summary after debug fix:", updatedSummary);
+          // console.log("✅ Summary after debug fix:", updatedSummary);
         } else {
-          console.log("✅ Review data is consistent!");
+          // console.log("✅ Review data is consistent!");
         }
       } catch (error) {
         console.error("Error loading reviews:", error);

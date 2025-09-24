@@ -177,9 +177,9 @@ export const updateProductStock = async (
         (v: ProductVariant) => v.size === variantSize
       );
 
-      console.log(
-        `✅ Stock updated for ${productId} (${variantSize}ml): ${variant.stockQty}`
-      );
+      // console.log(
+      //   `✅ Stock updated for ${productId} (${variantSize}ml): ${variant.stockQty}`
+      // );
 
       return {
         success: true,
@@ -209,7 +209,7 @@ export const placeOrder = async (
   orderData: Omit<Order, "id" | "createdAt" | "updatedAt" | "status">
 ): Promise<string> => {
   try {
-    console.log("🛒 Starting place order with inventory management");
+    // console.log("🛒 Starting place order with inventory management");
 
     // Kiểm tra và trừ tồn kho cho từng item
     const stockUpdates: Array<{
@@ -261,7 +261,7 @@ export const placeOrder = async (
     // Tạo order sau khi đã trừ tồn kho thành công
     const orderId = await createOrder(userId, orderData);
 
-    console.log("🛒 Order placed successfully with inventory updated");
+    // console.log("🛒 Order placed successfully with inventory updated");
     return orderId;
   } catch (error) {
     console.error("🛒 Error placing order:", error);
@@ -278,16 +278,16 @@ export const createOrder = async (
   orderData: Omit<Order, "id" | "createdAt" | "updatedAt" | "status">
 ): Promise<string> => {
   try {
-    console.log("🔥 Firebase createOrder - Starting...");
-    console.log("🔥 User ID:", userId);
-    console.log("🔥 Input orderData:", JSON.stringify(orderData, null, 2));
+    // console.log("🔥 Firebase createOrder - Starting...");
+    // console.log("🔥 User ID:", userId);
+    // console.log("🔥 Input orderData:", JSON.stringify(orderData, null, 2));
 
     // Path: users/{userId}/orders
     const userOrdersRef = ref(database, `users/${userId}/orders`);
-    console.log("🔥 User orders ref created");
+    // console.log("🔥 User orders ref created");
 
     const newOrderRef = push(userOrdersRef);
-    console.log("🔥 New order ref created, key:", newOrderRef.key);
+    // console.log("🔥 New order ref created, key:", newOrderRef.key);
 
     const order: Order = {
       ...orderData,
@@ -296,7 +296,7 @@ export const createOrder = async (
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    console.log("🔥 Order object created:", JSON.stringify(order, null, 2));
+    // console.log("🔥 Order object created:", JSON.stringify(order, null, 2));
 
     // Loại bỏ tất cả undefined values trước khi lưu vào Firebase
     const cleanOrder = removeUndefinedValues(order);
@@ -305,18 +305,18 @@ export const createOrder = async (
     //   JSON.stringify(cleanOrder, null, 2)
     // );
 
-    console.log("🔥 Attempting to write to Firebase...");
+    // console.log("🔥 Attempting to write to Firebase...");
     await set(newOrderRef, cleanOrder);
-    console.log("🔥 Successfully wrote to Firebase!");
+    // console.log("🔥 Successfully wrote to Firebase!");
 
     // Kiểm tra lại xem order đã được lưu chưa
-    console.log("🔥 Verifying order was saved...");
+    // console.log("🔥 Verifying order was saved...");
     const verification = await get(newOrderRef);
     if (verification.exists()) {
-      console.log("🔥 ✅ Order verified: Data exists in Firebase!");
-      console.log("🔥 Saved data:", verification.val());
+      // console.log("🔥 ✅ Order verified: Data exists in Firebase!");
+      // console.log("🔥 Saved data:", verification.val());
     } else {
-      console.log("🔥 ❌ Warning: Order verification failed - data not found!");
+      // console.log("🔥 ❌ Warning: Order verification failed - data not found!");
     }
 
     return newOrderRef.key!;
@@ -396,7 +396,7 @@ export const getUserPurchaseHistory = async (
   userId: string
 ): Promise<string[]> => {
   try {
-    console.log("🛒 Getting purchase history for user:", userId);
+    // console.log("🛒 Getting purchase history for user:", userId);
     const userOrdersRef = ref(database, `users/${userId}/orders`);
     const snapshot = await get(userOrdersRef);
 
@@ -435,15 +435,15 @@ export const getUserPurchaseHistory = async (
         }
       });
 
-      console.log(
-        "🛒 Purchase history found:",
-        sortedProductIds.length,
-        "unique products"
-      );
+      // console.log(
+      //   "🛒 Purchase history found:",
+      //   sortedProductIds.length,
+      //   "unique products"
+      // );
       return sortedProductIds;
     }
 
-    console.log("🛒 No purchase history found for user");
+    // console.log("🛒 No purchase history found for user");
     return [];
   } catch (error) {
     console.error("Error getting purchase history:", error);
@@ -505,7 +505,7 @@ export const cancelOrder = async (
   orderId: string
 ): Promise<void> => {
   try {
-    console.log("🔥 Cancelling order:", orderId, "for user:", userId);
+    // console.log("🔥 Cancelling order:", orderId, "for user:", userId);
 
     // Lấy thông tin đơn hàng hiện tại
     const orderRef = ref(database, `users/${userId}/orders/${orderId}`);
@@ -528,9 +528,9 @@ export const cancelOrder = async (
     // Hoàn lại tồn kho cho từng item có variant
     const restorePromises = currentOrder.items.map(async (item) => {
       if (item.variant) {
-        console.log(
-          `🔄 Restoring stock for ${item.name} (${item.variant.size}ml): +${item.quantity}`
-        );
+        // console.log(
+        //   `🔄 Restoring stock for ${item.name} (${item.variant.size}ml): +${item.quantity}`
+        // );
         const restoreResult = await updateProductStock(
           item.id,
           item.variant.size,
@@ -556,7 +556,7 @@ export const cancelOrder = async (
     };
 
     await set(orderRef, updatedOrder);
-    console.log("🔥 Order cancelled successfully with inventory restored");
+    // console.log("🔥 Order cancelled successfully with inventory restored");
   } catch (error) {
     console.error("Error cancelling order:", error);
     if (error instanceof Error) {
@@ -572,10 +572,10 @@ export const cancelOrder = async (
  */
 export const clearUserCart = async (userId: string): Promise<void> => {
   try {
-    console.log("🔥 Clearing cart for user:", userId);
+    // console.log("🔥 Clearing cart for user:", userId);
     const cartRef = ref(database, `users/${userId}/cart`);
     await set(cartRef, null);
-    console.log("🔥 Cart cleared successfully");
+    // console.log("🔥 Cart cleared successfully");
   } catch (error) {
     console.error("Error clearing cart:", error);
     throw new Error("Không thể xóa giỏ hàng.");
@@ -591,24 +591,24 @@ export const removeItemsFromUserCart = async (
   itemIds: string[]
 ): Promise<void> => {
   try {
-    console.log("🔥 Removing specific items from cart for user:", userId);
-    console.log("🔥 Items to remove:", itemIds);
+    // console.log("🔥 Removing specific items from cart for user:", userId);
+    // console.log("🔥 Items to remove:", itemIds);
 
     const cartRef = ref(database, `users/${userId}/cart`);
     const snapshot = await get(cartRef);
 
     if (snapshot.exists()) {
       const currentCart = snapshot.val();
-      console.log("🔥 Current cart:", currentCart);
+      // console.log("🔥 Current cart:", currentCart);
 
       // Filter out the items that were purchased
-      console.log("🔥 Current cart keys:", Object.keys(currentCart));
-      console.log("🔥 Items to remove (itemIds):", itemIds);
+      // console.log("🔥 Current cart keys:", Object.keys(currentCart));
+      // console.log("🔥 Items to remove (itemIds):", itemIds);
 
       const updatedCart = Object.keys(currentCart)
         .filter((key) => {
           const shouldKeep = !itemIds.includes(key);
-          console.log(`🔥 Key: ${key}, shouldKeep: ${shouldKeep}`);
+          // console.log(`🔥 Key: ${key}, shouldKeep: ${shouldKeep}`);
           return shouldKeep;
         })
         .reduce((obj: any, key) => {
@@ -616,18 +616,18 @@ export const removeItemsFromUserCart = async (
           return obj;
         }, {});
 
-      console.log("🔥 Updated cart after removing items:", updatedCart);
+      // console.log("🔥 Updated cart after removing items:", updatedCart);
 
       // If cart is empty after removing items, set to null, otherwise update with remaining items
       if (Object.keys(updatedCart).length === 0) {
         await set(cartRef, null);
-        console.log("🔥 Cart is now empty, set to null");
+        // console.log("🔥 Cart is now empty, set to null");
       } else {
         await set(cartRef, updatedCart);
-        console.log("🔥 Cart updated with remaining items");
+        // console.log("🔥 Cart updated with remaining items");
       }
     } else {
-      console.log("🔥 No cart found for user");
+      // console.log("🔥 No cart found for user");
     }
   } catch (error) {
     console.error("Error removing items from cart:", error);
@@ -640,22 +640,22 @@ export const removeItemsFromUserCart = async (
  */
 export const getUserOrdersDebug = async (userId: string): Promise<void> => {
   try {
-    console.log("🔥 DEBUG: Fetching all orders for user:", userId);
+    // console.log("🔥 DEBUG: Fetching all orders for user:", userId);
     const userOrdersRef = ref(database, `users/${userId}/orders`);
     const snapshot = await get(userOrdersRef);
 
     if (snapshot.exists()) {
       const allOrders = snapshot.val();
-      console.log(
-        "🔥 DEBUG: User orders in Firebase:",
-        JSON.stringify(allOrders, null, 2)
-      );
-      console.log(
-        "🔥 DEBUG: Total orders count:",
-        Object.keys(allOrders).length
-      );
+      // console.log(
+      //   "🔥 DEBUG: User orders in Firebase:",
+      //   JSON.stringify(allOrders, null, 2)
+      // );
+      // console.log(
+      //   "🔥 DEBUG: Total orders count:",
+      //   Object.keys(allOrders).length
+      // );
     } else {
-      console.log("🔥 DEBUG: No orders found for user in Firebase database");
+      // console.log("🔥 DEBUG: No orders found for user in Firebase database");
     }
   } catch (error) {
     console.error("🔥 DEBUG: Error fetching user orders:", error);

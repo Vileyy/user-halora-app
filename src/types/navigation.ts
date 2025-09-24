@@ -7,7 +7,7 @@ export type RootStackParamList = {
     product?: {
       id: string;
       name: string;
-      price: string;
+      price?: string;
       description: string;
       image: string;
       category: string;
@@ -15,7 +15,8 @@ export type RootStackParamList = {
       variants?: Array<{
         price: number;
         size: string;
-        stock: number;
+        stockQty: number;
+        sku?: string;
       }>;
     };
     productId?: string;

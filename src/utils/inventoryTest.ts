@@ -18,36 +18,36 @@ export const testInventoryManagement = async () => {
   const testVariantSize = "50"; // 50ml variant
   const testUserId = "test-user-123";
 
-  console.log("🧪 Testing Inventory Management System");
-  console.log("=====================================");
+  // console.log("🧪 Testing Inventory Management System");
+  // console.log("=====================================");
 
   try {
     // Test 1: Check initial stock
-    console.log("📦 Test 1: Checking initial stock");
+    // console.log("📦 Test 1: Checking initial stock");
     const initialStock = await checkProductStock(
       testProductId,
       testVariantSize,
       1
     );
-    console.log("Initial stock check:", initialStock);
+    // console.log("Initial stock check:", initialStock);
 
     if (!initialStock.success) {
-      console.log("❌ Initial stock check failed:", initialStock.message);
+      // console.log("❌ Initial stock check failed:", initialStock.message);
       return;
     }
 
     // Test 2: Try to order more than available stock
-    console.log("\n🚫 Test 2: Trying to order more than available stock");
+    // console.log("\n🚫 Test 2: Trying to order more than available stock");
     const excessiveQuantity = (initialStock.availableStock || 0) + 10;
     const excessiveOrder = await checkProductStock(
       testProductId,
       testVariantSize,
       excessiveQuantity
     );
-    console.log("Excessive order check:", excessiveOrder);
+    // console.log("Excessive order check:", excessiveOrder);
 
     // Test 3: Place a valid order
-    console.log("\n✅ Test 3: Placing a valid order");
+    // console.log("\n✅ Test 3: Placing a valid order");
     const orderQuantity = Math.min(2, initialStock.availableStock || 1);
 
     const sampleOrderData = {
@@ -75,28 +75,28 @@ export const testInventoryManagement = async () => {
       appliedCoupon: null,
     };
 
-    console.log("Attempting to place order...");
+    // console.log("Attempting to place order...");
     // Note: This would actually place an order and reduce inventory
     // const orderId = await placeOrder(testUserId, sampleOrderData);
     // console.log("✅ Order placed successfully:", orderId);
 
     // Test 4: Check stock after order
-    console.log("\n📊 Test 4: Checking stock after order");
+    // console.log("\n📊 Test 4: Checking stock after order");
     const stockAfterOrder = await checkProductStock(
       testProductId,
       testVariantSize,
       1
     );
-    console.log("Stock after order:", stockAfterOrder);
+    // console.log("Stock after order:", stockAfterOrder);
 
     // Test 5: Cancel order (this would restore inventory)
-    console.log("\n↩️ Test 5: Testing order cancellation");
+    // console.log("\n↩️ Test 5: Testing order cancellation");
     // Note: This would restore inventory
     // await cancelOrder(testUserId, orderId);
     // console.log("✅ Order cancelled, inventory restored");
 
-    console.log("\n🎉 Inventory management test completed!");
-    console.log("=====================================");
+    // console.log("\n🎉 Inventory management test completed!");
+    // console.log("=====================================");
   } catch (error) {
     console.error("❌ Test failed:", error);
   }
@@ -109,8 +109,8 @@ export const testConcurrentPurchases = async () => {
   const testProductId = "-OZEKNi8jt8oSgzpBmPU";
   const testVariantSize = "50";
 
-  console.log("🏃‍♂️ Testing Concurrent Purchases");
-  console.log("=================================");
+  // console.log("🏃‍♂️ Testing Concurrent Purchases");
+  // console.log("=================================");
 
   try {
     // Check initial stock
@@ -120,18 +120,18 @@ export const testConcurrentPurchases = async () => {
       1
     );
     if (!initialStock.success) {
-      console.log("❌ Cannot test concurrent purchases - no stock available");
+      // console.log("❌ Cannot test concurrent purchases - no stock available");
       return;
     }
 
     const availableStock = initialStock.availableStock || 0;
-    console.log(`📦 Initial stock: ${availableStock}`);
+    // console.log(`📦 Initial stock: ${availableStock}`);
 
     // Simulate multiple concurrent purchase attempts
     const concurrentAttempts = Math.min(5, availableStock + 2); // Try to buy more than available
-    console.log(
-      `🚀 Simulating ${concurrentAttempts} concurrent purchase attempts...`
-    );
+    // console.log(
+    //   `🚀 Simulating ${concurrentAttempts} concurrent purchase attempts...`
+    // );
 
     const promises = Array.from(
       { length: concurrentAttempts },
@@ -155,10 +155,10 @@ export const testConcurrentPurchases = async () => {
 
     const results = await Promise.all(promises);
 
-    console.log("📊 Concurrent purchase results:");
+    // console.log("📊 Concurrent purchase results:");
     results.forEach((result, i) => {
       const status = result.success ? "✅" : "❌";
-      console.log(`  ${status} Attempt ${i + 1}: ${result.message}`);
+      // console.log(`  ${status} Attempt ${i + 1}: ${result.message}`);
     });
 
     // Check final stock
@@ -167,22 +167,22 @@ export const testConcurrentPurchases = async () => {
       testVariantSize,
       1
     );
-    console.log(`📦 Final stock: ${finalStock.availableStock}`);
+    // console.log(`📦 Final stock: ${finalStock.availableStock}`);
 
     const successfulPurchases = results.filter((r) => r.success).length;
     const expectedFinalStock = availableStock - successfulPurchases;
 
     if (finalStock.availableStock === expectedFinalStock) {
-      console.log(
-        "✅ Concurrent purchase test passed - inventory is consistent!"
-      );
+      // console.log(
+      //   "✅ Concurrent purchase test passed - inventory is consistent!"
+      // );
     } else {
-      console.log(
-        "❌ Concurrent purchase test failed - inventory inconsistency detected!"
-      );
+      // console.log(
+      //   "❌ Concurrent purchase test failed - inventory inconsistency detected!"
+      // );
     }
 
-    console.log("=================================");
+    // console.log("=================================");
   } catch (error) {
     console.error("❌ Concurrent purchase test failed:", error);
   }
@@ -192,8 +192,8 @@ export const testConcurrentPurchases = async () => {
  * Display current inventory status for all products
  */
 export const displayInventoryStatus = async () => {
-  console.log("📊 Current Inventory Status");
-  console.log("===========================");
+  // console.log("📊 Current Inventory Status");
+  // console.log("===========================");
 
   // This would require fetching all products from Firebase
   // For now, we'll just show how to check specific products
@@ -207,7 +207,7 @@ export const displayInventoryStatus = async () => {
   ];
 
   for (const product of testProducts) {
-    console.log(`\n🧴 ${product.name}:`);
+    // console.log(`\n🧴 ${product.name}:`);
 
     // Check common variant sizes
     const commonSizes = ["50", "135", "150"];
@@ -216,9 +216,9 @@ export const displayInventoryStatus = async () => {
       try {
         const stockCheck = await checkProductStock(product.id, size, 1);
         if (stockCheck.success && stockCheck.availableStock !== undefined) {
-          console.log(
-            `  ${size}ml: ${stockCheck.availableStock} units in stock`
-          );
+          // console.log(
+          //   `  ${size}ml: ${stockCheck.availableStock} units in stock`
+          // );
         }
       } catch (error) {
         // Size doesn't exist for this product, skip
@@ -226,5 +226,5 @@ export const displayInventoryStatus = async () => {
     }
   }
 
-  console.log("===========================");
+  // console.log("===========================");
 };

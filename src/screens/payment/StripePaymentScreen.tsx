@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,7 +70,6 @@ function StripePaymentContent() {
   const route = useRoute<StripePaymentScreenRouteProp>();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { confirmPayment } = useConfirmPayment();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -122,30 +122,37 @@ function StripePaymentContent() {
       return;
     }
 
-    if (!cardDetails?.complete) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin thẻ");
-      return;
-    }
-
     setIsProcessing(true);
     try {
-      const { error, paymentIntent } = await confirmPayment(clientSecret, {
-        paymentMethodType: "Card",
-        paymentMethodData: {
-          billingDetails: {
-            name: user?.displayName || "Customer",
-            email: user?.email || "",
-          },
+      // Initialize Payment Sheet
+      const init = await initPaymentSheet({
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: "Halora Cosmetics",
+        customerId: user?.uid,
+        customerEphemeralKeySecret: undefined,
+        defaultBillingDetails: {
+          name: user?.displayName || "Customer",
+          email: user?.email || "",
         },
       });
 
-      if (error) {
-        console.error("Payment error:", error);
-        Alert.alert("Thanh toán thất bại", error.message);
+      if (init.error) {
+        console.error("Payment sheet init error:", init.error);
+        Alert.alert("Lỗi", init.error.message);
         return;
       }
 
-      if (paymentIntent?.status === "Succeeded") {
+      // Present Payment Sheet
+      const result = await presentPaymentSheet();
+
+      if (result.error) {
+        console.error("Payment sheet error:", result.error);
+        Alert.alert("Thanh toán thất bại", result.error.message);
+        return;
+      }
+
+      // Payment succeeded
+      if (!result.error) {
         await createOrderAfterPayment();
       }
     } catch (error) {
@@ -306,29 +313,33 @@ function StripePaymentContent() {
             <Text style={styles.sectionTitle}>Thông tin thẻ</Text>
           </View>
 
-          <View style={styles.cardInputContainer}>
-            <CardField
-              postalCodeEnabled={false}
-              placeholders={{
-                number: "1234 5678 9012 3456",
-              }}
-              cardStyle={styles.modernCardField}
-              style={styles.modernCardFieldContainer}
-              onCardChange={(cardDetails) => {
-                setCardDetails(cardDetails);
-              }}
-            />
-          </View>
+          <View style={styles.cardFormContainer}>
+            <View style={styles.paymentMethodCard}>
+              <View style={styles.paymentMethodContent}>
+                <View style={styles.paymentMethodIcon}>
+                  <Ionicons name="card" size={24} color="#6366F1" />
+                </View>
+                <View style={styles.paymentMethodInfo}>
+                  <Text style={styles.paymentMethodTitle}>
+                    Thẻ tín dụng/ghi nợ (Stripe)
+                  </Text>
+                  <Text style={styles.paymentMethodSubtitle}>
+                    Thanh toán an toàn với Stripe
+                  </Text>
+                </View>
+                <View style={styles.paymentMethodStatus}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                </View>
+              </View>
+            </View>
 
-          <View style={styles.cardHintContainer}>
-            <Ionicons
-              name="information-circle-outline"
-              size={16}
-              color="#6B7280"
-            />
-            {/* <Text style={styles.cardHint}>
-              Thẻ test: 4242 4242 4242 4242 • MM/YY: 12/25 • CVC: 123
-            </Text> */}
+            {/* Security Info */}
+            <View style={styles.securityInfo}>
+              <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+              <Text style={styles.securityText}>
+                Thông tin thẻ được mã hóa và bảo mật bởi Stripe
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -413,15 +424,14 @@ function StripePaymentContent() {
         <TouchableOpacity
           style={[
             styles.modernPayButton,
-            (isProcessing || !clientSecret || !cardDetails?.complete) &&
-              styles.payButtonDisabled,
+            (isProcessing || !clientSecret) && styles.payButtonDisabled,
           ]}
           onPress={handlePayment}
-          disabled={isProcessing || !clientSecret || !cardDetails?.complete}
+          disabled={isProcessing || !clientSecret}
         >
           <LinearGradient
             colors={
-              isProcessing || !clientSecret || !cardDetails?.complete
+              isProcessing || !clientSecret
                 ? ["#9CA3AF", "#6B7280"]
                 : ["#6366F1", "#8B5CF6"]
             }
@@ -555,6 +565,137 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
+  },
+  cardFormContainer: {
+    marginTop: 16,
+  },
+  cardInputRow: {
+    marginBottom: 20,
+  },
+  cardInputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  cardNumberContainer: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  cardNumberField: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    fontSize: 16,
+    color: "#1F2937",
+    borderWidth: 1,
+  },
+  cardNumberFieldContainer: {
+    height: 50,
+  },
+  cardDetailsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  cardDetailItem: {
+    flex: 1,
+  },
+  cardExpiryContainer: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  cardCvcContainer: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  cardDetailField: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    fontSize: 16,
+    color: "#1F2937",
+    borderWidth: 1,
+  },
+  cardDetailFieldContainer: {
+    height: 50,
+  },
+  paymentMethodCard: {
+    backgroundColor: "#F0F9FF",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#3B82F6",
+    marginBottom: 16,
+  },
+  paymentMethodButton: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 16,
+  },
+  paymentMethodContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+  },
+  paymentMethodIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  paymentMethodInfo: {
+    flex: 1,
+  },
+  paymentMethodTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginBottom: 2,
+  },
+  paymentMethodSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  paymentMethodArrow: {
+    marginLeft: 12,
+  },
+  paymentMethodStatus: {
+    marginLeft: 12,
+  },
+  cardNumberInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    fontSize: 16,
+    color: "#1F2937",
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    height: 50,
+  },
+  cardDetailInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    fontSize: 16,
+    color: "#1F2937",
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    height: 50,
   },
   sectionHeader: {
     flexDirection: "row",

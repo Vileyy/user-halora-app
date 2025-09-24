@@ -102,7 +102,7 @@ export default function HomeScreen() {
   // Load user behavior data từ Firebase
   const loadUserBehaviorData = async (userId: string) => {
     try {
-      console.log("🔄 Loading real user behavior data for:", userId);
+      // console.log("🔄 Loading real user behavior data for:", userId);
 
       // Load thực tế từ Firebase orders
       const realPurchaseHistory = await getUserPurchaseHistory(userId);
@@ -117,12 +117,12 @@ export default function HomeScreen() {
         // favorites: await loadFavorites(userId),
       }));
 
-      console.log("🔄 ✅ Loaded real user behavior data:", {
-        userId,
-        purchaseHistoryCount: realPurchaseHistory.length,
-        viewedCount: realViewedProducts.length,
-        purchaseHistory: realPurchaseHistory.slice(0, 5), // Log first 5 for debug
-      });
+      // console.log("🔄 ✅ Loaded real user behavior data:", {
+      //   userId,
+      //   purchaseHistoryCount: realPurchaseHistory.length,
+      //   viewedCount: realViewedProducts.length,
+      //   purchaseHistory: realPurchaseHistory.slice(0, 5), // Log first 5 for debug
+      // });
 
       // Note: Không cần fallback ở đây nữa vì AI service sẽ tự động handle user mới
       // AI service sẽ tạo popular recommendations cho user không có purchase history
@@ -136,7 +136,7 @@ export default function HomeScreen() {
           ...prev,
           purchaseHistory: mockPurchaseHistory,
         }));
-        console.log("🔄 Fallback to mock data due to error");
+        // console.log("🔄 Fallback to mock data due to error");
       } catch (fallbackError) {
         console.error("Error even with fallback data:", fallbackError);
       }
@@ -234,15 +234,15 @@ export default function HomeScreen() {
                 },
                 timeSpent: {
                   ...prev.sessionBehavior.timeSpent,
-                  [product.id]: Date.now(), 
+                  [product.id]: Date.now(),
                 },
               },
             }));
 
-            console.log(
-              "👆 User clicked on recommended product:",
-              product.name
-            );
+            // console.log(
+            //   "👆 User clicked on recommended product:",
+            //   product.name
+            // );
 
             (navigation as any).navigate("ProductDetailScreen", {
               productId: product.id,
