@@ -479,7 +479,9 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       if (relevantProducts.length > 0) {
         prompt += `\nSản phẩm có sẵn trong cửa hàng:\n`;
         relevantProducts.forEach((product, index) => {
-          prompt += `${index + 1}. ${product.name} - ${product.price} VNĐ\n`;
+          prompt += `${index + 1}. ${
+            product.name
+          } - ${this.getFirstVariantPrice(product)} VNĐ\n`;
           prompt += `   Mô tả: ${product.description || "Không có mô tả"}\n`;
         });
         prompt += `\nHãy đề xuất sản phẩm phù hợp từ danh sách trên nếu có.\n`;
@@ -653,7 +655,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
         recommendations.push({
           id: selectedProduct.id,
           name: selectedProduct.name,
-          price: selectedProduct.price?.toString() || "0",
+          price: this.getFirstVariantPrice(selectedProduct),
           image:
             selectedProduct.image ||
             selectedProduct.images?.[0] ||
@@ -678,7 +680,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
         recommendations.push({
           id: product.id,
           name: product.name,
-          price: product.price?.toString() || "0",
+          price: this.getFirstVariantPrice(product),
           image:
             product.image ||
             product.images?.[0] ||
@@ -822,6 +824,26 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
   }
 
   /**
+   * Lấy giá từ variant đầu tiên của sản phẩm
+   */
+  private getFirstVariantPrice(product: any): string {
+    if (
+      !product.variants ||
+      !Array.isArray(product.variants) ||
+      product.variants.length === 0
+    ) {
+      return "0";
+    }
+
+    const firstVariant = product.variants[0];
+    if (!firstVariant || !firstVariant.price || firstVariant.price <= 0) {
+      return "0";
+    }
+
+    return firstVariant.price.toString();
+  }
+
+  /**
    * Tìm sản phẩm phù hợp từ user message
    */
   private findMatchingProducts(
@@ -879,7 +901,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
     return matchedProducts.slice(0, 3).map((product) => ({
       id: product.id,
       name: product.name,
-      price: product.price?.toString() || "0",
+      price: this.getFirstVariantPrice(product),
       image:
         product.image ||
         product.images?.[0] ||
@@ -982,7 +1004,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
       recommendations.push({
         id: product.id,
         name: product.name,
-        price: product.price?.toString() || "0",
+        price: this.getFirstVariantPrice(product),
         image:
           product.image ||
           product.images?.[0] ||

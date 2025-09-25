@@ -1,5 +1,5 @@
 import { database } from "./firebase";
-import { ref, onValue, off } from "firebase/database";
+import { ref, onValue, off, update, get } from "firebase/database";
 
 export interface VoucherData {
   id: string;
@@ -191,6 +191,84 @@ export class VoucherService {
     }
 
     return { valid: true };
+  }
+
+  /**
+   * Cập nhật usage count của voucher sau khi sử dụng
+   */
+  public async updateVoucherUsage(voucherId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      const voucherRef = ref(database, `vouchers/${voucherId}`);
+      const snapshot = await get(voucherRef);
+
+      if (!snapshot.exists()) {
+        return { success: false, message: "Voucher không tồn tại" };
+      }
+
+      const voucherData = snapshot.val();
+      const currentUsage = voucherData.usageCount || 0;
+      const newUsage = currentUsage + 1;
+
+      // Kiểm tra xem có vượt quá giới hạn không
+      if (newUsage > voucherData.usageLimit) {
+        return { success: false, message: "Voucher đã hết lượt sử dụng" };
+      }
+
+      // Cập nhật usage count
+      await update(voucherRef, {
+        usageCount: newUsage,
+        updatedAt: new Date().getTime(),
+      });
+
+      // console.log(
+      //   `✅ Voucher ${voucherData.code} usage updated: ${newUsage}/${voucherData.usageLimit}`
+      // );
+
+      return { success: true, message: "Cập nhật voucher thành công" };
+    } catch (error) {
+      console.error("Error updating voucher usage:", error);
+      return { success: false, message: "Không thể cập nhật voucher" };
+    }
+  }
+
+  /**
+   * Cập nhật usage count cho nhiều voucher cùng lúc
+   */
+  public async updateMultipleVoucherUsage(voucherIds: string[]): Promise<{
+    success: boolean;
+    message: string;
+    results: Array<{ voucherId: string; success: boolean; message: string }>;
+  }> {
+    const results: Array<{
+      voucherId: string;
+      success: boolean;
+      message: string;
+    }> = [];
+    let allSuccess = true;
+
+    for (const voucherId of voucherIds) {
+      const result = await this.updateVoucherUsage(voucherId);
+      results.push({
+        voucherId,
+        success: result.success,
+        message: result.message,
+      });
+
+      if (!result.success) {
+        allSuccess = false;
+      }
+    }
+
+    return {
+      success: allSuccess,
+      message: allSuccess
+        ? "Tất cả voucher đã được cập nhật"
+        : "Một số voucher không thể cập nhật",
+      results,
+    };
   }
 }
 

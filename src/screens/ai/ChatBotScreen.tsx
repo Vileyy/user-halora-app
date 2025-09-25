@@ -165,13 +165,6 @@ Bạn cần tư vấn gì hôm nay?`,
     handleSendMessage(reply);
   };
 
-  const formatPrice = (price: string | number): string => {
-    if (!price || price === "0") return "0";
-    const numPrice =
-      typeof price === "string" ? parseInt(price.replace(/\D/g, "")) : price;
-    return numPrice.toLocaleString("vi-VN");
-  };
-
   const handleViewProducts = () => {
     Alert.alert(
       "Xem sản phẩm được đề xuất",
@@ -258,9 +251,6 @@ Bạn cần tư vấn gì hôm nay?`,
                 <View style={styles.productInfo}>
                   <Text style={styles.productName} numberOfLines={2}>
                     {product.name}
-                  </Text>
-                  <Text style={styles.productPrice}>
-                    {formatPrice(product.price)} VNĐ
                   </Text>
                   <Text style={styles.productReason} numberOfLines={2}>
                     {product.reason}
@@ -640,12 +630,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
     marginBottom: 4,
-  },
-  productPrice: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#FF99CC",
-    marginBottom: 2,
   },
   productReason: {
     fontSize: 11,

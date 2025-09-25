@@ -176,8 +176,6 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
           {item.name}
         </Text>
 
-        <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
-
         {showReason && (
           <View style={styles.reasonContainer}>
             <Ionicons name="bulb-outline" size={12} color="#FF99CC" />
@@ -333,12 +331,6 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 4,
     minHeight: 36,
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "red",
-    marginBottom: 8,
   },
   reasonContainer: {
     flexDirection: "row",

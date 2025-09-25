@@ -48,8 +48,8 @@ export default function VoucherCard({
         return "car-outline";
       case "product":
         return voucher.discountType === "percentage"
-          ? "percent-outline"
-          : "cash-outline";
+          ? "pricetag-outline"
+          : "wallet-outline";
       default:
         return "gift-outline";
     }

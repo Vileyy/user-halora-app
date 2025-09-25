@@ -141,11 +141,11 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
           getProductReviewSummary(productId),
         ]);
 
-        console.log(`📊 Loaded reviews for product ${productId}:`, {
-          reviewsCount: reviewsData.length,
-          summaryTotal: summaryData?.totalReviews,
-          summaryAvg: summaryData?.averageRating,
-        });
+        // console.log(`📊 Loaded reviews for product ${productId}:`, {
+        //   reviewsCount: reviewsData.length,
+        //   summaryTotal: summaryData?.totalReviews,
+        //   summaryAvg: summaryData?.averageRating,
+        // });
 
         setReviews(reviewsData);
         setSummary(summaryData);

@@ -7,8 +7,6 @@ import SearchScreen from "../../screens/search/SearchScreen";
 import CartScreen from "../../screens/cart/CartScreen";
 import NotifyScreen from "../../screens/notify/NotifyScreen";
 import ProfileScreen from "../../screens/profile/ProfileScreen";
-
-// Nếu bạn có Redux để lấy badge số thông báo:
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 
@@ -34,7 +32,6 @@ export default function MainTabs() {
         },
         tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color, size }) => {
-          // icon theo từng tab
           switch (route.name) {
             case "HomeScreen":
               return (

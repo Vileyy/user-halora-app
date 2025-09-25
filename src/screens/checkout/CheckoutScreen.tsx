@@ -30,6 +30,7 @@ import {
 } from "../../services/orderService";
 import voucherService, { VoucherData } from "../../services/voucherService";
 import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
+import SelectedVoucherCard from "../../components/SelectedVoucherCard";
 import {
   validateUserForOrder,
   createValidationMessage,
@@ -277,6 +278,33 @@ function CheckoutContent() {
       const orderId = (result.payload as any).orderId;
       await getUserOrdersDebug(user!.uid);
 
+      // Cập nhật voucher usage count
+      const voucherIdsToUpdate: string[] = [];
+      if (appliedShippingVoucher) {
+        voucherIdsToUpdate.push(appliedShippingVoucher.id);
+      }
+      if (appliedProductVoucher) {
+        voucherIdsToUpdate.push(appliedProductVoucher.id);
+      }
+
+      if (voucherIdsToUpdate.length > 0) {
+        try {
+          const voucherUpdateResult =
+            await voucherService.updateMultipleVoucherUsage(voucherIdsToUpdate);
+          if (voucherUpdateResult.success) {
+            // console.log("✅ Voucher usage updated successfully");
+          } else {
+            console.warn(
+              "⚠️ Some vouchers could not be updated:",
+              voucherUpdateResult.message
+            );
+          }
+        } catch (voucherError) {
+          console.error("Error updating voucher usage:", voucherError);
+          // Không throw error vì đơn hàng đã thành công
+        }
+      }
+
       const purchasedItemIds = selectedItems.map((item) => item.id);
       try {
         await removeItemsFromUserCart(user!.uid, purchasedItemIds);
@@ -418,10 +446,10 @@ function CheckoutContent() {
                 appliedCoupon: appliedCoupon || null,
               };
 
-              console.log(
-                "Creating order with data:",
-                JSON.stringify(orderData, null, 2)
-              );
+              // console.log(
+              //   "Creating order with data:",
+              //   JSON.stringify(orderData, null, 2)
+              // );
 
               // Use the new inventory-aware order placement
               const result = await dispatch(
@@ -437,6 +465,35 @@ function CheckoutContent() {
 
               const orderId = (result.payload as any).orderId;
               await getUserOrdersDebug(user.uid);
+
+              // Cập nhật voucher usage count
+              const voucherIdsToUpdate: string[] = [];
+              if (appliedShippingVoucher) {
+                voucherIdsToUpdate.push(appliedShippingVoucher.id);
+              }
+              if (appliedProductVoucher) {
+                voucherIdsToUpdate.push(appliedProductVoucher.id);
+              }
+
+              if (voucherIdsToUpdate.length > 0) {
+                try {
+                  const voucherUpdateResult =
+                    await voucherService.updateMultipleVoucherUsage(
+                      voucherIdsToUpdate
+                    );
+                  if (voucherUpdateResult.success) {
+                    // console.log("✅ Voucher usage updated successfully");
+                  } else {
+                    console.warn(
+                      "⚠️ Some vouchers could not be updated:",
+                      voucherUpdateResult.message
+                    );
+                  }
+                } catch (voucherError) {
+                  console.error("Error updating voucher usage:", voucherError);
+                  // Không throw error vì đơn hàng đã thành công
+                }
+              }
 
               const purchasedItemIds = selectedItems.map((item) => item.id);
               try {
@@ -455,7 +512,7 @@ function CheckoutContent() {
                 orderId,
                 totalAmount: finalTotal,
               });
-              console.log("Navigated to OrderSuccessScreen");
+              // console.log("Navigated to OrderSuccessScreen");
             } catch (error) {
               console.error("Error placing order:", error);
 
@@ -527,70 +584,98 @@ function CheckoutContent() {
         {/* Halora Voucher */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Halora Voucher</Text>
-          <TouchableOpacity
-            style={styles.voucherButtonFullWidth}
-            onPress={() => {
-              navigation.navigate("VoucherScreen", {
-                currentTotal: itemsSubtotal,
-                onVoucherSelect: (vouchers: {
-                  shippingVoucher?: string;
-                  productVoucher?: string;
-                }) => {
-                  setAppliedShippingVoucher(null);
-                  setAppliedProductVoucher(null);
-                  setAppliedCoupon(null);
 
-                  if (vouchers.shippingVoucher) {
-                    const shippingVoucher = allVouchers.find(
-                      (v) => v.code === vouchers.shippingVoucher
-                    );
-                    if (shippingVoucher) {
-                      const validation = voucherService.isVoucherValid(
-                        shippingVoucher,
-                        itemsSubtotal
-                      );
-                      if (validation.valid) {
-                        setAppliedShippingVoucher(shippingVoucher);
-                        setCouponCode(shippingVoucher.code);
-                      }
-                    }
-                  }
+          {/* Hiển thị voucher đã chọn */}
+          {appliedShippingVoucher && (
+            <SelectedVoucherCard
+              voucher={appliedShippingVoucher}
+              onRemove={() => {
+                setAppliedShippingVoucher(null);
+                setCouponCode("");
+              }}
+            />
+          )}
 
-                  // Handle product voucher
-                  if (vouchers.productVoucher) {
-                    const productVoucher = allVouchers.find(
-                      (v) => v.code === vouchers.productVoucher
-                    );
-                    if (productVoucher) {
-                      const validation = voucherService.isVoucherValid(
-                        productVoucher,
-                        itemsSubtotal
+          {appliedProductVoucher && (
+            <SelectedVoucherCard
+              voucher={appliedProductVoucher}
+              onRemove={() => {
+                setAppliedProductVoucher(null);
+                setCouponCode("");
+              }}
+            />
+          )}
+
+          {/* Nút chọn voucher nếu chưa có voucher nào */}
+          {!appliedShippingVoucher && !appliedProductVoucher && (
+            <TouchableOpacity
+              style={styles.voucherButtonFullWidth}
+              onPress={() => {
+                navigation.navigate("VoucherScreen", {
+                  currentTotal: itemsSubtotal,
+                  onVoucherSelect: (vouchers: {
+                    shippingVoucher?: string;
+                    productVoucher?: string;
+                  }) => {
+                    setAppliedShippingVoucher(null);
+                    setAppliedProductVoucher(null);
+                    setAppliedCoupon(null);
+
+                    if (vouchers.shippingVoucher) {
+                      const shippingVoucher = allVouchers.find(
+                        (v) => v.code === vouchers.shippingVoucher
                       );
-                      if (validation.valid) {
-                        setAppliedProductVoucher(productVoucher);
-                        if (!vouchers.shippingVoucher) {
-                          setCouponCode(productVoucher.code);
+                      if (shippingVoucher) {
+                        const validation = voucherService.isVoucherValid(
+                          shippingVoucher,
+                          itemsSubtotal
+                        );
+                        if (validation.valid) {
+                          setAppliedShippingVoucher(shippingVoucher);
+                          setCouponCode(shippingVoucher.code);
                         }
                       }
                     }
-                  }
-                },
-              });
-            }}
-          >
-            <View style={styles.voucherButtonContent}>
-              <Ionicons name="gift-outline" size={18} color="#FF6B7D" />
-              <Text style={styles.voucherButtonText}>Chọn voucher có sẵn</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#FF6B7D" />
-          </TouchableOpacity>
 
-          <View style={styles.couponContainer}>
+                    // Handle product voucher
+                    if (vouchers.productVoucher) {
+                      const productVoucher = allVouchers.find(
+                        (v) => v.code === vouchers.productVoucher
+                      );
+                      if (productVoucher) {
+                        const validation = voucherService.isVoucherValid(
+                          productVoucher,
+                          itemsSubtotal
+                        );
+                        if (validation.valid) {
+                          setAppliedProductVoucher(productVoucher);
+                          if (!vouchers.shippingVoucher) {
+                            setCouponCode(productVoucher.code);
+                          }
+                        }
+                      }
+                    }
+                  },
+                });
+              }}
+            >
+              <View style={styles.voucherButtonContent}>
+                <Ionicons name="gift-outline" size={18} color="#FF6B7D" />
+                <Text style={styles.voucherButtonText}>
+                  Chọn voucher có sẵn
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#FF6B7D" />
+            </TouchableOpacity>
+          )}
+
+          {/* Input cho voucher cũ (fallback) */}
+          {/* <View style={styles.couponContainer}>
             <View style={styles.couponInputContainer}>
               <Ionicons name="pricetag-outline" size={20} color="#666" />
               <TextInput
                 style={styles.couponInput}
-                placeholder="Vui lòng chọn Voucher có sẵn"
+                placeholder="Hoặc nhập mã voucher thủ công"
                 value={couponCode}
                 onChangeText={setCouponCode}
                 placeholderTextColor="#999"
@@ -603,19 +688,23 @@ function CheckoutContent() {
             >
               <Text style={styles.applyButtonText}>Áp dụng</Text>
             </TouchableOpacity>
-          </View>
-          {appliedCoupon && (
-            <View style={styles.couponAppliedRow}>
-              <Ionicons name="checkmark-circle" size={18} color="#FF6B7D" />
-              <Text style={styles.couponAppliedText}>
-                Đã áp dụng mã{" "}
-                <Text style={{ fontWeight: "700" }}>{appliedCoupon}</Text>
-              </Text>
-              <TouchableOpacity onPress={() => setAppliedCoupon(null)}>
-                <Text style={styles.removeCouponText}>Gỡ</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          </View> */}
+
+          {/* Hiển thị voucher cũ đã áp dụng */}
+          {appliedCoupon &&
+            !appliedShippingVoucher &&
+            !appliedProductVoucher && (
+              <View style={styles.couponAppliedRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#FF6B7D" />
+                <Text style={styles.couponAppliedText}>
+                  Đã áp dụng mã{" "}
+                  <Text style={{ fontWeight: "700" }}>{appliedCoupon}</Text>
+                </Text>
+                <TouchableOpacity onPress={() => setAppliedCoupon(null)}>
+                  <Text style={styles.removeCouponText}>Gỡ</Text>
+                </TouchableOpacity>
+              </View>
+            )}
         </View>
 
         {/* Phương thức vận chuyển */}

@@ -31,8 +31,8 @@ export interface ProductRecommendation {
   image: string;
   description: string;
   category: string;
-  reason: string; // Lý do AI đề xuất
-  confidence: number; // Độ tin cậy từ 0-1
+  reason: string; 
+  confidence: number; 
   tags?: string[];
   suitableFor?: string[];
 }
@@ -59,15 +59,15 @@ export interface AIConversation {
 
 export interface SmartRecommendationContext {
   userId: string;
-  currentProduct?: any; // Product đang xem
-  recentlyViewed: string[]; // IDs của products đã xem
-  purchaseHistory: string[]; // IDs của products đã mua
-  searchHistory: string[]; // Từ khóa tìm kiếm gần đây
-  favorites: string[]; // IDs của products yêu thích
-  cartItems: string[]; // IDs của products trong giỏ
+  currentProduct?: any; 
+  recentlyViewed: string[]; 
+  purchaseHistory: string[]; 
+  searchHistory: string[]; 
+  favorites: string[]; 
+  cartItems: string[]; 
   sessionBehavior: {
-    timeSpent: { [productId: string]: number }; // Thời gian xem từng product
-    interactions: { [productId: string]: number }; // Số lần tương tác
+    timeSpent: { [productId: string]: number }; 
+    interactions: { [productId: string]: number };
   };
 }
 
