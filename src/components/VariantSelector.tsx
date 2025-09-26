@@ -117,38 +117,52 @@ const VariantSelector: React.FC<VariantSelectorProps> = ({
           {/* Variants */}
           <ScrollView style={styles.variantsContainer}>
             <Text style={styles.sectionTitle}>Dung tích:</Text>
-            {product.variants.map((variant, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.variantItem,
-                  selectedVariant === variant && styles.selectedVariant,
-                ]}
-                onPress={() => {
-                  setSelectedVariant(variant);
-                  setQuantity(1); // Reset quantity when variant changes
-                }}
-              >
-                <View style={styles.variantInfo}>
-                  <Text style={styles.variantSize}>{variant.size}ml</Text>
-                  <Text style={styles.variantPrice}>
-                    {variant.price.toLocaleString()}₫
-                  </Text>
-                </View>
-                <View style={styles.variantStock}>
-                  <Text style={styles.stockText}>
-                    Còn {variant.stockQty} sản phẩm
-                  </Text>
-                  {selectedVariant === variant && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color="#FF6B7D"
-                    />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+            {product.variants.map((variant, index) => {
+              const isOutOfStock = variant.stockQty === 0;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.variantItem,
+                    selectedVariant === variant && styles.selectedVariant,
+                    isOutOfStock && styles.outOfStockVariant,
+                  ]}
+                  onPress={() => {
+                    if (!isOutOfStock) {
+                      setSelectedVariant(variant);
+                      setQuantity(1); // Reset quantity when variant changes
+                    }
+                  }}
+                  disabled={isOutOfStock}
+                >
+                  <View style={styles.variantInfo}>
+                    <Text style={styles.variantSize}>{variant.size}ml</Text>
+                    <Text style={styles.variantPrice}>
+                      {variant.price.toLocaleString()}₫
+                    </Text>
+                  </View>
+                  <View style={styles.variantStock}>
+                    <Text
+                      style={[
+                        styles.stockText,
+                        isOutOfStock && styles.outOfStockText,
+                      ]}
+                    >
+                      {isOutOfStock
+                        ? "Hết hàng"
+                        : `Còn ${variant.stockQty} sản phẩm`}
+                    </Text>
+                    {selectedVariant === variant && !isOutOfStock && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color="#FF6B7D"
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
           {/* Quantity Selector */}
@@ -309,6 +323,11 @@ const styles = StyleSheet.create({
     borderColor: "#FF6B7D",
     backgroundColor: "#fff5f5",
   },
+  outOfStockVariant: {
+    opacity: 0.5,
+    backgroundColor: "#f5f5f5",
+    borderColor: "#ddd",
+  },
   variantInfo: {
     flex: 1,
   },
@@ -330,6 +349,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginBottom: 4,
+  },
+  outOfStockText: {
+    color: "#999",
+    fontWeight: "500",
   },
   quantitySection: {
     paddingHorizontal: 16,

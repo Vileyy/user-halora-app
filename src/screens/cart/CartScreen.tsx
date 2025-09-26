@@ -16,6 +16,14 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { CartItem } from "../../redux/slices/cartSlice";
 import { useCartSync } from "../../hooks/useCartSync";
+
+// Utility function để tạo unique key cho cart item
+const createUniqueKey = (item: CartItem): string => {
+  if (item.variant?.size) {
+    return `${item.id}_${item.variant.size}`;
+  }
+  return item.id;
+};
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -91,16 +99,18 @@ export default function CartScreen() {
     };
   }, [cartItems]);
 
-  const handleQuantityChange = (id: string, newQuantity: number) => {
+  const handleQuantityChange = (item: CartItem, newQuantity: number) => {
+    const uniqueKey = createUniqueKey(item);
     if (newQuantity <= 0) {
-      handleRemoveItem(id);
+      handleRemoveItem(item);
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateItemQuantity(id, newQuantity);
+    updateItemQuantity(uniqueKey, newQuantity);
   };
 
-  const handleRemoveItem = (id: string) => {
+  const handleRemoveItem = (item: CartItem) => {
+    const uniqueKey = createUniqueKey(item);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
       "Xóa sản phẩm",
@@ -110,7 +120,7 @@ export default function CartScreen() {
         {
           text: "Xóa",
           style: "destructive",
-          onPress: () => removeItemFromCart(id),
+          onPress: () => removeItemFromCart(uniqueKey),
         },
       ]
     );
@@ -145,9 +155,10 @@ export default function CartScreen() {
     }
   };
 
-  const handleToggleItemSelect = (id: string) => {
+  const handleToggleItemSelect = (item: CartItem) => {
+    const uniqueKey = createUniqueKey(item);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    toggleItemSelect(id);
+    toggleItemSelect(uniqueKey);
   };
 
   const handleCheckout = () => {
@@ -192,7 +203,7 @@ export default function CartScreen() {
       {/* Checkbox */}
       <TouchableOpacity
         style={styles.checkboxContainer}
-        onPress={() => handleToggleItemSelect(item.id)}
+        onPress={() => handleToggleItemSelect(item)}
       >
         <View
           style={[styles.checkbox, item.selected && styles.checkboxSelected]}
@@ -209,7 +220,12 @@ export default function CartScreen() {
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.productCategory}>{item.category}</Text>
+        {item.variant?.size && (
+          <Text style={styles.productVariant}>
+            Dung tích: {item.variant.size}ml
+          </Text>
+        )}
+        {/* <Text style={styles.productCategory}>{item.category}</Text> */}
         <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
       </View>
 
@@ -220,7 +236,7 @@ export default function CartScreen() {
               styles.quantityButton,
               item.quantity <= 1 && styles.quantityButtonDisabled,
             ]}
-            onPress={() => handleQuantityChange(item.id, item.quantity - 1)}
+            onPress={() => handleQuantityChange(item, item.quantity - 1)}
             disabled={item.quantity <= 1}
           >
             <Ionicons
@@ -239,7 +255,7 @@ export default function CartScreen() {
               styles.quantityButton,
               item.quantity >= 99 && styles.quantityButtonDisabled,
             ]}
-            onPress={() => handleQuantityChange(item.id, item.quantity + 1)}
+            onPress={() => handleQuantityChange(item, item.quantity + 1)}
             disabled={item.quantity >= 99}
           >
             <Ionicons
@@ -252,7 +268,7 @@ export default function CartScreen() {
 
         <TouchableOpacity
           style={styles.removeButton}
-          onPress={() => handleRemoveItem(item.id)}
+          onPress={() => handleRemoveItem(item)}
         >
           <Ionicons name="trash-outline" size={18} color="#FF6B7D" />
         </TouchableOpacity>
@@ -370,7 +386,7 @@ export default function CartScreen() {
       <FlatList
         data={cartItems}
         renderItem={renderCartItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => createUniqueKey(item)}
         contentContainerStyle={[
           styles.cartList,
           cartItems.length === 0 && styles.emptyList,
@@ -530,6 +546,17 @@ const styles = StyleSheet.create({
     color: "#1a1a1a",
     marginBottom: 4,
     lineHeight: 22,
+  },
+  productVariant: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+    marginBottom: 4,
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: "flex-start",
   },
   productCategory: {
     fontSize: 12,

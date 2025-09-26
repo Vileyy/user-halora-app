@@ -531,8 +531,16 @@ function CheckoutContent() {
     );
   };
 
+  // Utility function để tạo unique key cho cart item
+  const createUniqueKey = (item: CartItem): string => {
+    if (item.variant?.size) {
+      return `${item.id}_${item.variant.size}`;
+    }
+    return item.id;
+  };
+
   const renderProductItem = (item: CartItem) => (
-    <View key={item.id} style={styles.productItem}>
+    <View key={createUniqueKey(item)} style={styles.productItem}>
       <Image source={{ uri: item.image }} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>

@@ -19,6 +19,14 @@ import {
 } from "../redux/slices/cartSlice";
 import { CartItem } from "../redux/slices/cartSlice";
 
+// Utility function để tạo unique key cho cart item
+const createUniqueKey = (item: CartItem): string => {
+  if (item.variant?.size) {
+    return `${item.id}_${item.variant.size}`;
+  }
+  return item.id;
+};
+
 export const useCartSync = () => {
   const dispatch = useDispatch();
   const cartItems = useSelector((state: RootState) => state.cart.items);

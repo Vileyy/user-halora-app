@@ -45,7 +45,7 @@ const Banner: React.FC = () => {
           animated: true,
         });
         setActiveIndex(nextIndex);
-      }, 3000); 
+      }, 3000);
     }
     return () => clearInterval(scrollInterval);
   }, [banners, activeIndex]);
@@ -59,7 +59,7 @@ const Banner: React.FC = () => {
       if (data) {
         const bannerArray = Object.values(data as Record<string, BannerItem>)
           .filter((item) => item.isActive === true)
-          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); 
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         setBanners(bannerArray);
       }
       setLoading(false);
@@ -123,10 +123,16 @@ const Banner: React.FC = () => {
         contentContainerStyle={styles.flatListContainer}
         onViewableItemsChanged={handleViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onScrollToIndexFailed={(info) => {
+          // console.warn("ScrollToIndex failed:", info);
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        }}
         renderItem={({ item }) => {
           const imageUrl =
-            item.imageUrl || "https://via.placeholder.com/500x180"; // Fallback image
-          const title = item.title || "Untitled Banner"; // Fallback title
+            item.imageUrl || "https://via.placeholder.com/500x180"; 
+          const title = item.title || "Untitled Banner"; 
           return (
             <TouchableOpacity
               activeOpacity={0.9}

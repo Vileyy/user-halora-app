@@ -1,5 +1,13 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+// Utility function để tạo unique key cho cart item
+const createUniqueKey = (item: CartItem): string => {
+  if (item.variant?.size) {
+    return `${item.id}_${item.variant.size}`;
+  }
+  return item.id;
+};
+
 export interface CartItem {
   id: string;
   name: string;
@@ -41,9 +49,11 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addToCart: (state, action: PayloadAction<CartItem>) => {
+      const payloadKey = createUniqueKey(action.payload);
       const existingItem = state.items.find(
-        (item) => item.id === action.payload.id
+        (item) => createUniqueKey(item) === payloadKey
       );
+
       const sanitizedPayload = {
         ...action.payload,
         price: action.payload.price?.toString() || "0",
@@ -57,12 +67,20 @@ const cartSlice = createSlice({
       if (existingItem) {
         existingItem.quantity += sanitizedPayload.quantity;
       } else {
+        // Kiểm tra duplicate keys trước khi thêm
+        const duplicateKeys = state.items.map((item) => createUniqueKey(item));
+        if (duplicateKeys.includes(payloadKey)) {
+          console.warn(`Duplicate key detected: ${payloadKey}`);
+          return;
+        }
         state.items.push(sanitizedPayload);
       }
     },
 
     removeFromCart: (state, action: PayloadAction<string>) => {
-      state.items = state.items.filter((item) => item.id !== action.payload);
+      state.items = state.items.filter(
+        (item) => createUniqueKey(item) !== action.payload
+      );
     },
 
     removeSelectedItems: (state, action: PayloadAction<string[]>) => {
@@ -81,7 +99,9 @@ const cartSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; quantity: number }>
     ) => {
-      const item = state.items.find((item) => item.id === action.payload.id);
+      const item = state.items.find(
+        (item) => createUniqueKey(item) === action.payload.id
+      );
       if (item) {
         item.quantity = action.payload.quantity;
       }
@@ -95,7 +115,9 @@ const cartSlice = createSlice({
     },
 
     toggleItemSelection: (state, action: PayloadAction<string>) => {
-      const item = state.items.find((item) => item.id === action.payload);
+      const item = state.items.find(
+        (item) => createUniqueKey(item) === action.payload
+      );
       if (item) {
         item.selected = !item.selected;
       }
@@ -114,14 +136,18 @@ const cartSlice = createSlice({
     },
 
     selectItem: (state, action: PayloadAction<string>) => {
-      const item = state.items.find((item) => item.id === action.payload);
+      const item = state.items.find(
+        (item) => createUniqueKey(item) === action.payload
+      );
       if (item) {
         item.selected = true;
       }
     },
 
     unselectItem: (state, action: PayloadAction<string>) => {
-      const item = state.items.find((item) => item.id === action.payload);
+      const item = state.items.find(
+        (item) => createUniqueKey(item) === action.payload
+      );
       if (item) {
         item.selected = false;
       }
