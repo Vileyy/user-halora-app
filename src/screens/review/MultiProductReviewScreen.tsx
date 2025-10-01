@@ -111,7 +111,14 @@ export default function MultiProductReviewScreen() {
 
         // Get review data for each product
         const reviewsData: ProductReviewData[] = [];
-        for (const item of orderData.items) {
+
+        // Loại bỏ duplicate products (chỉ giữ unique productId)
+        const uniqueProducts = orderData.items.filter(
+          (item, index, self) =>
+            index === self.findIndex((t) => t.id === item.id)
+        );
+
+        for (const item of uniqueProducts) {
           const canReview = await canUserReviewProduct(
             user.uid,
             item.id,
@@ -208,11 +215,11 @@ export default function MultiProductReviewScreen() {
     }
   };
 
-  // Auto scroll to the focused input 
+  // Auto scroll to the focused input
   const handleCommentFocus = (index: number) => {
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({
-        y: index * 400 + 200, 
+        y: index * 400 + 200,
         animated: true,
       });
     }, 300);
@@ -291,7 +298,10 @@ export default function MultiProductReviewScreen() {
             </View>
 
             {reviewableProducts.map((productReview, index) => (
-              <View key={productReview.productId} style={styles.productSection}>
+              <View
+                key={`reviewable-${productReview.productId}-${index}`}
+                style={styles.productSection}
+              >
                 {/* Product Info */}
                 <View style={styles.productHeader}>
                   <Image
@@ -421,9 +431,9 @@ export default function MultiProductReviewScreen() {
               <Text style={styles.sectionTitle}>Đã đánh giá</Text>
             </View>
 
-            {reviewedProducts.map((productReview) => (
+            {reviewedProducts.map((productReview, index) => (
               <View
-                key={productReview.productId}
+                key={`reviewed-${productReview.productId}-${index}`}
                 style={styles.reviewedSection}
               >
                 <View style={styles.productHeader}>

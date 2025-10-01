@@ -21,6 +21,7 @@ import { clearCart } from "../../redux/slices/cartSlice";
 import { clearFavorites } from "../../redux/slices/favoritesSlice";
 import { useAuth } from "../../hooks/useAuth";
 import AuthRequiredModal from "../../components/AuthRequiredModal";
+import { getUserReviews, Review } from "../../services/reviewService";
 
 interface User {
   uid: string;
@@ -43,6 +44,8 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
+  const [reviewsCount, setReviewsCount] = useState(0);
   const auth = getAuth();
   const dispatch = useDispatch();
   const { isAuthenticated } = useAuth();
@@ -50,6 +53,12 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
   useEffect(() => {
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchUserReviews();
+    }
+  }, [isAuthenticated, user]);
 
   const fetchUserData = () => {
     const currentUser = auth.currentUser;
@@ -81,6 +90,18 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
     }
   };
 
+  const fetchUserReviews = async () => {
+    if (!user) return;
+
+    try {
+      const reviews = await getUserReviews(user.uid);
+      setUserReviews(reviews);
+      setReviewsCount(reviews.length);
+    } catch (error) {
+      console.error("Error fetching user reviews:", error);
+    }
+  };
+
   const handleMenuPress = (menuItem: string) => {
     // Kiểm tra đăng nhập trước khi thực hiện action
     if (!isAuthenticated) {
@@ -103,6 +124,9 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
         break;
       case "favorites":
         // Navigate to favorites screen
+        break;
+      case "reviews":
+        navigation.navigate("UserReviewListScreen");
         break;
       case "logout":
         handleLogout();
@@ -216,6 +240,13 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
       color: "#333",
     },
     {
+      id: "reviews",
+      title: "Quản lý đánh giá",
+      icon: "star-outline",
+      color: "#333",
+      badge: reviewsCount > 0 ? reviewsCount : undefined,
+    },
+    {
       id: "logout",
       title: "Đăng xuất",
       icon: "log-out-outline",
@@ -324,6 +355,11 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
                 <Text style={[styles.menuTitle, { color: item.color }]}>
                   {item.title}
                 </Text>
+                {item.badge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.badge}</Text>
+                  </View>
+                )}
               </View>
 
               <Ionicons name="chevron-forward" size={16} color="#999" />
@@ -478,6 +514,21 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 16,
     fontWeight: "500",
+  },
+  badge: {
+    backgroundColor: "#FF6B7D",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
   },
   statusContainer: {
     marginHorizontal: 16,

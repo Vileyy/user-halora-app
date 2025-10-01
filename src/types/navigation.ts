@@ -91,6 +91,7 @@ export type RootStackParamList = {
   MultiProductReviewScreen: {
     orderId: string;
   };
+  UserReviewListScreen: undefined;
   ContactScreen: undefined;
   ChatBotScreen: {
     userProfile?: {

@@ -23,6 +23,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { getOrder, Order, cancelOrder } from "../../services/orderService";
 import { cancelOrderWithInventory } from "../../redux/slices/orderSlice";
+import { getDatabase, ref, get } from "firebase/database";
 
 const { width } = Dimensions.get("window");
 
@@ -44,6 +45,7 @@ export default function OrderDetailScreen() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [processingCancel, setProcessingCancel] = useState(false);
   const [animatedValue] = useState(new Animated.Value(0));
+  const [isOrderReviewed, setIsOrderReviewed] = useState(false);
 
   // Animation for modal
   useEffect(() => {
@@ -73,6 +75,31 @@ export default function OrderDetailScreen() {
     outputRange: [0, 1],
   });
 
+  // Kiểm tra xem đơn hàng đã được đánh giá chưa
+  const checkOrderReviewed = async (): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const db = getDatabase();
+      const reviewsRef = ref(db, "reviews");
+      const snapshot = await get(reviewsRef);
+
+      if (snapshot.exists()) {
+        const reviews = snapshot.val();
+        for (const key in reviews) {
+          const review = reviews[key];
+          if (review.userId === user.uid && review.orderId === orderId) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking review status:", error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     const fetchOrderDetail = async () => {
       try {
@@ -93,6 +120,12 @@ export default function OrderDetailScreen() {
         if (orderData) {
           // console.log("🔥 Order found:", orderData);
           setOrder(orderData);
+
+          // Kiểm tra trạng thái đánh giá nếu đơn hàng đã được giao
+          if (orderData.status === "delivered") {
+            const reviewed = await checkOrderReviewed();
+            setIsOrderReviewed(reviewed);
+          }
         } else {
           // console.log("🔥 Order not found");
           setError("Không tìm thấy thông tin đơn hàng");
@@ -566,26 +599,44 @@ export default function OrderDetailScreen() {
           )}
 
           {/* Nút Đánh giá sản phẩm - chỉ hiển thị khi status là delivered */}
-          {order.status === "delivered" && (
-            <TouchableOpacity
-              style={styles.reviewButton}
-              onPress={() => {
-                if (order.id) {
-                  navigation.navigate("MultiProductReviewScreen", {
-                    orderId: order.id,
-                  });
-                }
-              }}
-            >
-              <Ionicons
-                name="star-outline"
-                size={20}
-                color="#f39c12"
-                style={styles.buttonIcon}
-              />
-              <Text style={styles.reviewButtonText}>Đánh giá sản phẩm</Text>
-            </TouchableOpacity>
-          )}
+          {order.status === "delivered" &&
+            (isOrderReviewed ? (
+              <TouchableOpacity
+                style={[styles.reviewButton, styles.reviewedButton]}
+                disabled={true}
+              >
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color="#95a5a6"
+                  style={styles.buttonIcon}
+                />
+                <Text
+                  style={[styles.reviewButtonText, styles.reviewedButtonText]}
+                >
+                  Đã đánh giá
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.reviewButton}
+                onPress={() => {
+                  if (order.id) {
+                    navigation.navigate("MultiProductReviewScreen", {
+                      orderId: order.id,
+                    });
+                  }
+                }}
+              >
+                <Ionicons
+                  name="star-outline"
+                  size={20}
+                  color="#f39c12"
+                  style={styles.buttonIcon}
+                />
+                <Text style={styles.reviewButtonText}>Đánh giá sản phẩm</Text>
+              </TouchableOpacity>
+            ))}
 
           {/* Nút Mua lại - chỉ hiển thị khi status là cancelled */}
           {order.status === "cancelled" && (
@@ -1169,6 +1220,14 @@ const styles = StyleSheet.create({
     color: "#f39c12",
     fontWeight: "600",
     fontSize: 14,
+  },
+  reviewedButton: {
+    backgroundColor: "#f0f0f0",
+    borderColor: "#d0d0d0",
+    opacity: 0.7,
+  },
+  reviewedButtonText: {
+    color: "#95a5a6",
   },
   reorderButton: {
     flex: 1,

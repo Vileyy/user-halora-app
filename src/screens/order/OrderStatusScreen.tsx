@@ -16,6 +16,7 @@ import { RootStackParamList } from "../../types/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/reducers/rootReducer";
 import { getUserOrders, Order } from "../../services/orderService";
+import { getDatabase, ref, get } from "firebase/database";
 
 const MONEY = (n: number) => `${(n || 0).toLocaleString()}₫`;
 
@@ -25,10 +26,37 @@ export default function OrderStatusScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Kiểm tra xem đơn hàng đã được đánh giá chưa
+  const checkOrderReviewed = async (orderId: string): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const db = getDatabase();
+      const reviewsRef = ref(db, "reviews");
+      const snapshot = await get(reviewsRef);
+
+      if (snapshot.exists()) {
+        const reviews = snapshot.val();
+        // Kiểm tra xem có review nào của user cho orderId này không
+        for (const key in reviews) {
+          const review = reviews[key];
+          if (review.userId === user.uid && review.orderId === orderId) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking review status:", error);
+      return false;
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -40,6 +68,18 @@ export default function OrderStatusScreen() {
 
       const userOrders = await getUserOrders(user.uid);
       setOrders(userOrders);
+
+      // Kiểm tra trạng thái đánh giá của các đơn hàng delivered
+      const reviewedSet = new Set<string>();
+      for (const order of userOrders) {
+        if (order.status === "delivered" && order.id) {
+          const isReviewed = await checkOrderReviewed(order.id);
+          if (isReviewed) {
+            reviewedSet.add(order.id);
+          }
+        }
+      }
+      setReviewedOrders(reviewedSet);
     } catch (error) {
       console.error("Error fetching orders:", error);
       setError("Không thể tải danh sách đơn hàng");
@@ -276,13 +316,34 @@ export default function OrderStatusScreen() {
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
                 {order.status === "delivered" ? (
-                  <TouchableOpacity
-                    style={styles.reviewButton}
-                    onPress={() => handleReviewOrder(order)}
-                  >
-                    <Ionicons name="star-outline" size={16} color="white" />
-                    <Text style={styles.reviewButtonText}>Đánh giá</Text>
-                  </TouchableOpacity>
+                  order.id && reviewedOrders.has(order.id) ? (
+                    <TouchableOpacity
+                      style={[styles.reviewButton, styles.reviewedButton]}
+                      disabled={true}
+                    >
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={16}
+                        color="#95a5a6"
+                      />
+                      <Text
+                        style={[
+                          styles.reviewButtonText,
+                          styles.reviewedButtonText,
+                        ]}
+                      >
+                        Đã đánh giá
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.reviewButton}
+                      onPress={() => handleReviewOrder(order)}
+                    >
+                      <Ionicons name="star-outline" size={16} color="white" />
+                      <Text style={styles.reviewButtonText}>Đánh giá</Text>
+                    </TouchableOpacity>
+                  )
                 ) : (
                   <TouchableOpacity
                     style={styles.contactButton}
@@ -523,6 +584,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginLeft: 4,
+  },
+  reviewedButton: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.7,
+  },
+  reviewedButtonText: {
+    color: "#95a5a6",
   },
   contactButton: {
     flex: 1,

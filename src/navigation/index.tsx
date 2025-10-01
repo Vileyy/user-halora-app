@@ -20,6 +20,7 @@ import OrderHistoryScreen from "../screens/order/OrderHistoryScreen";
 import VoucherScreen from "../screens/voucher/VoucherScreen";
 import ReviewScreen from "../screens/review/ReviewScreen";
 import MultiProductReviewScreen from "../screens/review/MultiProductReviewScreen";
+import UserReviewListScreen from "../screens/review/UserReviewListScreen";
 import ContactScreen from "../screens/contact/ContactScreen";
 import ChatBotScreen from "../screens/ai/ChatBotScreen";
 
@@ -124,6 +125,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="MultiProductReviewScreen"
           component={MultiProductReviewScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="UserReviewListScreen"
+          component={UserReviewListScreen}
           options={{ headerShown: false }}
         />
 
