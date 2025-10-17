@@ -36,15 +36,12 @@ const AI_API_CONFIG = {
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta",
     model: "gemini-2.5-flash",
-    apiKey:
-      process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
-      "AIzaSyDzYveD78-3cXnDl4eapVhLIYBjHMEAOw0",
+    apiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
   },
   // OpenRouter API
   openrouter: {
     baseURL: "https://openrouter.ai/api/v1",
-    apiKey:
-      "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",
+    apiKey: process.env.EXPO_PUBLIC_OPENROUTER_API_KEY,
     model: "openai/gpt-3.5-turbo",
   },
 };
