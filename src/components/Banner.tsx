@@ -131,8 +131,8 @@ const Banner: React.FC = () => {
         }}
         renderItem={({ item }) => {
           const imageUrl =
-            item.imageUrl || "https://via.placeholder.com/500x180"; 
-          const title = item.title || "Untitled Banner"; 
+            item.imageUrl || "https://via.placeholder.com/500x180";
+          const title = item.title || "Untitled Banner";
           return (
             <TouchableOpacity
               activeOpacity={0.9}

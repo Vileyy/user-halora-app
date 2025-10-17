@@ -46,9 +46,9 @@ const Categories: React.FC = () => {
     console.log("Category pressed:", categoryTitle);
     (navigation as any).navigate("ViewAllScreen", {
       category: categoryTitle,
-      title: categoryTitle, 
+      title: categoryTitle,
     });
-  };  
+  };
 
   const renderItem = ({ item }: { item: CategoryItem }) => (
     <TouchableOpacity

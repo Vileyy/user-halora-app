@@ -31,8 +31,8 @@ export interface ProductRecommendation {
   image: string;
   description: string;
   category: string;
-  reason: string; 
-  confidence: number; 
+  reason: string;
+  confidence: number;
   tags?: string[];
   suitableFor?: string[];
 }
@@ -59,14 +59,17 @@ export interface AIConversation {
 
 export interface SmartRecommendationContext {
   userId: string;
-  currentProduct?: any; 
-  recentlyViewed: string[]; 
-  purchaseHistory: string[]; 
-  searchHistory: string[]; 
-  favorites: string[]; 
-  cartItems: string[]; 
+  currentProduct?: any;
+  recentlyViewed: string[];
+  purchaseHistory: string[];
+  searchHistory: string[];
+  favorites: string[];
+  cartItems: string[];
+  skinType?: string;
+  age?: number;
+  concerns?: string[];
   sessionBehavior: {
-    timeSpent: { [productId: string]: number }; 
+    timeSpent: { [productId: string]: number };
     interactions: { [productId: string]: number };
   };
 }

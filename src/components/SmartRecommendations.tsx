@@ -84,14 +84,10 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
         purchaseHistory: context.purchaseHistory,
         favorites: context.favorites,
         searchHistory: context.searchHistory,
+        skinType: (context as any).skinType,
+        age: (context as any).age,
+        concerns: (context as any).concerns,
       };
-
-      // console.log("🎯 Loading recommendations with context:", {
-      //   userId: context.userId,
-      //   purchaseHistory: context.purchaseHistory?.slice(0, 3),
-      //   recentlyViewed: context.recentlyViewed?.slice(0, 3),
-      //   shownRecommendations: shownRecommendations.slice(0, 3),
-      // });
 
       const recs = await aiService.getSmartRecommendations(
         context.userId,

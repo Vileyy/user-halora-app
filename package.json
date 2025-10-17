@@ -49,8 +49,11 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/plugin-transform-runtime": "^7.28.3",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.0.10",
+    "babel-plugin-transform-remove-console": "^6.9.4",
     "typescript": "~5.8.3"
   },
   "private": true

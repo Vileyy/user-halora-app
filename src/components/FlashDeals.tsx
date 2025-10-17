@@ -20,6 +20,8 @@ interface Variant {
   price: number;
   size: string;
   stock: number;
+  stockQty?: number;
+  sku?: string;
 }
 
 interface FlashDealItem {
@@ -129,8 +131,18 @@ const FlashDeals: React.FC = () => {
 
   // Xử lý khi bấm vào sản phẩm
   const handlePress = (product: FlashDealItem) => {
-    // console.log("Product pressed:", product);
-    navigation.navigate("ProductDetailScreen", { product });
+    // Map stock to stockQty for compatibility
+    const productWithStockQty = {
+      ...product,
+      variants: product.variants?.map((v) => ({
+        ...v,
+        stockQty: v.stock || v.stockQty || 0,
+      })),
+    };
+
+    navigation.navigate("ProductDetailScreen", {
+      product: productWithStockQty,
+    });
   };
 
   // Hàm lấy giá hiển thị (ưu tiên variant đầu tiên)

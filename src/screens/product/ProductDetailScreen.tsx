@@ -186,6 +186,10 @@ export default function ProductDetailScreen() {
       : `${priceNumber.toLocaleString()}₫`;
   }, [product.price, selectedVariant]);
 
+  const getProductPrice = () => {
+    return product.price || "0";
+  };
+
   const onToggleFavorite = () => setIsFavorite((prev) => !prev);
 
   const onShare = async () => {
@@ -223,7 +227,7 @@ export default function ProductDetailScreen() {
     addItemToCart({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: getProductPrice(),
       description: product.description,
       image: product.image,
       category: product.category,
@@ -382,10 +386,11 @@ export default function ProductDetailScreen() {
 
     // Logic for products without variants
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    const price = getProductPrice();
     addItemToCart({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: price,
       description: product.description,
       image: product.image,
       category: product.category,
@@ -405,7 +410,7 @@ export default function ProductDetailScreen() {
             {
               id: product.id,
               name: product.name,
-              price: product.price,
+              price: price,
               description: product.description,
               image: product.image,
               category: product.category,
@@ -414,7 +419,7 @@ export default function ProductDetailScreen() {
             },
           ],
           totalPrice:
-            parseInt(product.price.toString().replace(/[^\d]/g, "")) * quantity,
+            parseInt(price.toString().replace(/[^\d]/g, "")) * quantity,
         });
       },
     });

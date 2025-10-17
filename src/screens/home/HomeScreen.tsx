@@ -238,12 +238,6 @@ export default function HomeScreen() {
                 },
               },
             }));
-
-            // console.log(
-            //   "👆 User clicked on recommended product:",
-            //   product.name
-            // );
-
             (navigation as any).navigate("ProductDetailScreen", {
               productId: product.id,
               product: product,
