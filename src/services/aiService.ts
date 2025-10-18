@@ -204,7 +204,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       favorites?: string[];
       searchHistory?: string[];
     },
-    existingRecommendations: string[] = [] // IDs của sản phẩm đã được đề xuất
+    existingRecommendations: string[] = []
   ): Promise<ProductRecommendation[]> {
     try {
       // Wait for rate limit
@@ -214,7 +214,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       const excludedIds = new Set([
         ...existingRecommendations,
         ...(userBehavior.purchaseHistory || []),
-        ...(userBehavior.viewedProducts || []).slice(0, 3), // Loại bỏ 3 sản phẩm vừa xem gần nhất
+        ...(userBehavior.viewedProducts || []).slice(0, 3), 
       ]);
 
       const availableProducts = currentProducts.filter(

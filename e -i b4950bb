@@ -1,0 +1,33 @@
+[33mbd6c945[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: Upgrade AI service with OpenRouter integration and smart recommendations
+[33m18b689c[m feat: Upgrade AI service with OpenRouter integration and smart recommendations
+[33mb4950bb[m feat: Add review management system and fix duplicate key warnings
+[33m7f98728[m fix: cart item separation, variant display, and UI improvements
+[33m435ac00[m feat: Improve voucher system and clean up console logs
+[33m151b445[m feat: Add Stripe Payment Sheet integration
+[33mdcc2e9d[m Integrate Stripe payment system
+[33m91bc5f8[m feat: Add variant selection popup with quantity controls and price range display
+[33m69c13e4[m feat: variant pricing & dynamic brand display
+[33m749ad06[m update: update chat bot about addition function voice in chat bot Halora AI
+[33m136e04a[m remove .env from repo
+[33me022eaa[m feat: add AI cosmetic consultant chatbot with smart product recommendations
+[33m265f7e0[m feat: Fix Google login account switching & logout state clearing
+[33m0e12c9c[m feat: add order cancellation & fix search dropdown layout
+[33m46fd721[m feat: add user validation system and fix Google avatar display - Implement user info validation before order placement - Create UserInfoRequiredModal for missing information prompt - Fix Google login avatar not showing in profile screens - Smart validation: skip name check for Google users - Update Redux state sync for user data - Implement auto-scroll when focusing input fields in Login and Register
+[33ma4deae3[m feat(auth): integrate Google Sign-In with Firebase
+[33m2305c4d[m Add google-services.json for Google Sign-In
+[33m02c6c43[m feat(voucher): complete layout Voucher
+[33m17f147f[m feat(search): show product dropdown on click
+[33m67bebe5[m feat: Add order history screen and improve cart UX
+[33ma00a32d[m Complete EditProfileScreen
+[33m3c3cd57[m Complete Order Status, Detail Screen
+[33m81ee3c4[m Complete OrderDetail, OrderSuccess screen
+[33m5f4a861[m Complete Cart, Check out screen and check status user when open app
+[33m07b1b44[m Complete Cart, Check out screen
+[33m7e62004[m Update Animated Search Screen
+[33mc14da14[m update Animated in View All screen
+[33ma922d7e[m Complete Search, Notify Screen
+[33mbf68eef[m update Product Detail layout
+[33m41645d7[m add Haptics libary in product detail
+[33m9311c2e[m update layout product detail
+[33mf17d28f[m Complete bottom tab, HomeScreen, ProductDetail Screen
+[33m42d492f[m init project
