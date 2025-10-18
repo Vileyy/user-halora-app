@@ -27,23 +27,21 @@ export interface BeautyAdviceResponse {
 
 // AI API configuration
 const AI_API_CONFIG = {
-  openai: {
-    baseURL: "https://api.openai.com/v1",
-    model: "gpt-3.5-turbo",
-    apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY || "",
+  openrouter: {
+    baseURL: "https://openrouter.ai/api/v1",
+    model: process.env.EXPO_PUBLIC_AI_MODEL || "openai/gpt-3.5-turbo",
+    apiKey: process.env.EXPO_PUBLIC_OPENROUTER_API_KEY,
   },
-  // Gemini API
+  // Gemini API (fallback)
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta",
     model: "gemini-1.5-flash",
-    apiKey:
-      process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
-      "AIzaSyBcd8kxN9w_reBKovGp77VQQJWDnTif3a0",
+    apiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
   },
 };
 
 class AIService {
-  private currentProvider: "openai" | "gemini" = "gemini";
+  private currentProvider: "openrouter" | "gemini" = "openrouter";
   private lastRequestTime: number = 0;
   private minRequestInterval: number = 2000;
 
@@ -56,7 +54,6 @@ class AIService {
 
     if (timeSinceLastRequest < this.minRequestInterval) {
       const waitTime = this.minRequestInterval - timeSinceLastRequest;
-      // console.log(`⏳ Rate limit: waiting ${waitTime}ms...`);
       await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
 
@@ -86,15 +83,35 @@ class AIService {
         availableProducts
       );
 
-      if (this.currentProvider === "openai") {
-        const response = await this.callOpenAI(prompt);
-        return {
-          ...response,
-          recommendedProducts: this.findMatchingProducts(
-            userMessage,
-            availableProducts || []
-          ),
-        };
+      if (this.currentProvider === "openrouter") {
+        try {
+          const response = await this.callOpenRouter(prompt);
+          return {
+            ...response,
+            recommendedProducts: this.findMatchingProducts(
+              userMessage,
+              availableProducts || []
+            ),
+          };
+        } catch (openRouterError: any) {
+          // Nếu OpenRouter lỗi, thử Gemini
+          if (this.currentProvider === "openrouter") {
+            this.currentProvider = "gemini";
+          }
+
+          const response = await this.callGemini(prompt);
+          if (response) {
+            return {
+              ...response,
+              recommendedProducts: this.findMatchingProducts(
+                userMessage,
+                availableProducts || []
+              ),
+            };
+          } else {
+            throw new Error("Both OpenRouter and Gemini failed");
+          }
+        }
       } else {
         const response = await this.callGemini(prompt);
         if (response) {
@@ -110,7 +127,6 @@ class AIService {
         }
       }
     } catch (error) {
-      console.error("AI Service Error:", error);
       return {
         advice: this.getOfflineAdvice(userMessage),
         recommendedProducts: this.findMatchingProducts(
@@ -214,7 +230,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       const excludedIds = new Set([
         ...existingRecommendations,
         ...(userBehavior.purchaseHistory || []),
-        ...(userBehavior.viewedProducts || []).slice(0, 3), 
+        ...(userBehavior.viewedProducts || []).slice(0, 3),
       ]);
 
       const availableProducts = currentProducts.filter(
@@ -244,22 +260,50 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
           userBehavior
         );
 
-        if (this.currentProvider === "openai") {
-          const response = await this.callOpenAI(prompt);
-          const aiRecs = this.parseRecommendations(
-            response.advice,
-            availableProducts
-          );
-          recommendations = [...recommendations, ...aiRecs];
-        } else {
-          const response = await this.callGemini(prompt);
-          if (response) {
+        if (this.currentProvider === "openrouter") {
+          try {
+            const response = await this.callOpenRouter(prompt);
             const aiRecs = this.parseRecommendations(
               response.advice,
               availableProducts
             );
             recommendations = [...recommendations, ...aiRecs];
-          } else {
+          } catch (openRouterError: any) {
+            // Fallback to Gemini
+            try {
+              const response = await this.callGemini(prompt);
+              if (response) {
+                const aiRecs = this.parseRecommendations(
+                  response.advice,
+                  availableProducts
+                );
+                recommendations = [...recommendations, ...aiRecs];
+              } else {
+                const fallbackRecs =
+                  this.getFallbackRecommendations(availableProducts);
+                recommendations = [...recommendations, ...fallbackRecs];
+              }
+            } catch (geminiError: any) {
+              const fallbackRecs =
+                this.getFallbackRecommendations(availableProducts);
+              recommendations = [...recommendations, ...fallbackRecs];
+            }
+          }
+        } else {
+          try {
+            const response = await this.callGemini(prompt);
+            if (response) {
+              const aiRecs = this.parseRecommendations(
+                response.advice,
+                availableProducts
+              );
+              recommendations = [...recommendations, ...aiRecs];
+            } else {
+              const fallbackRecs =
+                this.getFallbackRecommendations(availableProducts);
+              recommendations = [...recommendations, ...fallbackRecs];
+            }
+          } catch (geminiError: any) {
             const fallbackRecs =
               this.getFallbackRecommendations(availableProducts);
             recommendations = [...recommendations, ...fallbackRecs];
@@ -269,9 +313,7 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
 
       // Nếu vẫn chưa có gì (user mới hoàn toàn), tạo popular recommendations
       if (recommendations.length === 0 && availableProducts.length > 0) {
-        // console.log(
-        //   "🆕 New user detected, generating popular product recommendations"
-        // );
+
         recommendations =
           this.getPopularProductRecommendations(availableProducts);
       }
@@ -281,7 +323,6 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
         this.removeDuplicateRecommendations(recommendations);
       return uniqueRecommendations.slice(0, 5);
     } catch (error) {
-      console.error("Smart Recommendations Error:", error);
       const availableProducts = currentProducts.filter(
         (product) => !existingRecommendations.includes(product.id)
       );
@@ -290,42 +331,58 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
   }
 
   /**
-   * Gọi OpenAI API
+   * Gọi OpenRouter API
    */
-  private async callOpenAI(prompt: string): Promise<BeautyAdviceResponse> {
-    const config = AI_API_CONFIG.openai;
+  private async callOpenRouter(prompt: string): Promise<BeautyAdviceResponse> {
+    const config = AI_API_CONFIG.openrouter;
 
-    const response = await axios.post(
-      `${config.baseURL}/chat/completions`,
-      {
-        model: config.model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Bạn là chuyên gia tư vấn mỹ phẩm chuyên nghiệp. Hãy đưa ra lời khuyên hữu ích, an toàn và phù hợp với từng loại da.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 500,
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          "Content-Type": "application/json",
+    // Kiểm tra API key
+    if (!config.apiKey || config.apiKey.trim() === "") {
+      throw new Error("OpenRouter API key not configured");
+    }
+
+    try {
+      const response = await axios.post(
+        `${config.baseURL}/chat/completions`,
+        {
+          model: config.model,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Bạn là chuyên gia tư vấn mỹ phẩm Halora chuyên nghiệp. Hãy đưa ra lời khuyên ngắn gọn (2-3 câu), dễ hiểu và thực tế. Luôn đề xuất sản phẩm cụ thể từ cửa hàng khi phù hợp. Sử dụng emoji để làm câu trả lời thân thiện hơn.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 500,
+          temperature: 0.7,
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://halora-app.com", 
+            "X-Title": "Halora Cosmetic App", 
+          },
+          timeout: 15000, // Tăng timeout
+        }
+      );
 
-    return {
-      advice: response.data.choices[0].message.content,
-      skinType: this.extractSkinType(response.data.choices[0].message.content),
-      concerns: this.extractConcerns(response.data.choices[0].message.content),
-    };
+      return {
+        advice: response.data.choices[0].message.content,
+        skinType: this.extractSkinType(
+          response.data.choices[0].message.content
+        ),
+        concerns: this.extractConcerns(
+          response.data.choices[0].message.content
+        ),
+      };
+    } catch (error: any) {
+      throw error;
+    }
   }
 
   /**
@@ -333,14 +390,6 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
    */
   private async callGemini(prompt: string): Promise<BeautyAdviceResponse> {
     const config = AI_API_CONFIG.gemini;
-
-    // Debug logs
-    // console.log("🔧 Gemini API Config:", {
-    //   apiKey: config.apiKey.substring(0, 10) + "...",
-    //   model: config.model,
-    //   baseURL: config.baseURL,
-    // });
-
     // use the most stable endpoint
     const endpoints = [
       {
@@ -481,15 +530,17 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
       }
     }
 
-    prompt += `\nHãy đưa ra lời khuyên chi tiết, an toàn và phù hợp. Tập trung vào:
-1. Phân tích vấn đề và nhu cầu
-2. Đề xuất giải pháp cụ thể
-3. Thành phần nên tìm kiếm
-4. Lưu ý khi sử dụng
-5. Routine chăm sóc da phù hợp
-6. Gợi ý sản phẩm cụ thể từ cửa hàng (nếu có)
+    prompt += `\nHãy trả lời ngắn gọn (2-3 câu) và thực tế:
+1. Phân tích nhanh vấn đề của người dùng
+2. Đề xuất giải pháp cụ thể và đơn giản
+3. Gợi ý sản phẩm phù hợp từ danh sách trên (nếu có)
+4. Lưu ý quan trọng khi sử dụng
 
-Trả lời bằng tiếng Việt, ngắn gọn nhưng đầy đủ thông tin.`;
+Format trả lời:
+- Ngắn gọn, dễ hiểu
+- Có emoji phù hợp
+- Đề xuất sản phẩm cụ thể khi có thể
+- Thân thiện và chuyên nghiệp`;
 
     return prompt;
   }
@@ -837,7 +888,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
   }
 
   /**
-   * Tìm sản phẩm phù hợp từ user message
+   * Tìm sản phẩm phù hợp từ user message với logic thông minh hơn
    */
   private findMatchingProducts(
     message: string,
@@ -850,7 +901,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
     const keywords = this.extractProductKeywords(message);
     const lowerMessage = message.toLowerCase();
 
-    // Tìm sản phẩm match với keywords
+    // Tìm sản phẩm match với keywords và semantic meaning
     const matchedProducts = availableProducts.filter((product) => {
       const productName = product.name?.toLowerCase() || "";
       const productDesc = product.description?.toLowerCase() || "";
@@ -864,34 +915,23 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
           productCategory.includes(keyword.toLowerCase())
       );
 
-      // Check semantic match
-      const semanticMatch =
-        (lowerMessage.includes("tẩy trang") &&
-          (productName.includes("tẩy") ||
-            productName.includes("làm sạch") ||
-            productCategory.includes("cleanser"))) ||
-        (lowerMessage.includes("dưỡng ẩm") &&
-          (productName.includes("dưỡng") ||
-            productName.includes("kem") ||
-            productCategory.includes("moisturizer"))) ||
-        (lowerMessage.includes("chống nắng") &&
-          (productName.includes("chống nắng") ||
-            productName.includes("spf") ||
-            productCategory.includes("sunscreen"))) ||
-        (lowerMessage.includes("trị mụn") &&
-          (productName.includes("mụn") ||
-            productName.includes("acne") ||
-            productDesc.includes("mụn"))) ||
-        (lowerMessage.includes("toner") &&
-          (productName.includes("toner") ||
-            productName.includes("nước hoa hồng"))) ||
-        (lowerMessage.includes("serum") && productName.includes("serum"));
+      // Check semantic match với logic thông minh hơn
+      const semanticMatch = this.checkSemanticMatch(lowerMessage, product);
 
       return keywordMatch || semanticMatch;
     });
 
+    // Sort theo độ phù hợp và chọn top 3
+    const scoredProducts = matchedProducts
+      .map((product) => ({
+        product,
+        score: this.calculateProductRelevanceScore(message, product),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
     // Convert to ProductRecommendation format
-    return matchedProducts.slice(0, 3).map((product) => ({
+    return scoredProducts.map(({ product }) => ({
       id: product.id,
       name: product.name,
       price: this.getFirstVariantPrice(product),
@@ -903,7 +943,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
         )}`,
       description: product.description || "",
       category: product.category || "",
-      reason: this.generateReasonForProduct(product, message),
+      reason: this.generateSmartReasonForProduct(product, message),
       confidence: 0.9,
     }));
   }
@@ -1241,6 +1281,171 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
   }
 
   /**
+   * Kiểm tra semantic match thông minh hơn
+   */
+  private checkSemanticMatch(message: string, product: any): boolean {
+    const productName = product.name?.toLowerCase() || "";
+    const productDesc = product.description?.toLowerCase() || "";
+    const productCategory = product.category?.toLowerCase() || "";
+
+    // Mapping các từ khóa và sản phẩm tương ứng
+    const semanticMappings = [
+      {
+        keywords: ["tẩy trang", "làm sạch", "rửa mặt", "cleanser"],
+        productTypes: ["tẩy", "làm sạch", "cleanser", "gel rửa", "sữa rửa"],
+      },
+      {
+        keywords: ["dưỡng ẩm", "cấp ẩm", "moisturizer", "kem dưỡng"],
+        productTypes: ["dưỡng", "kem", "moisturizer", "lotion", "cream"],
+      },
+      {
+        keywords: ["chống nắng", "spf", "sunscreen", "bảo vệ"],
+        productTypes: ["chống nắng", "spf", "sunscreen", "sunblock"],
+      },
+      {
+        keywords: ["trị mụn", "acne", "mụn", "viêm"],
+        productTypes: ["mụn", "acne", "trị mụn", "salicylic", "benzoyl"],
+      },
+      {
+        keywords: ["toner", "nước hoa hồng", "cân bằng"],
+        productTypes: ["toner", "nước hoa hồng", "balancing"],
+      },
+      {
+        keywords: ["serum", "tinh chất", "concentrate"],
+        productTypes: ["serum", "tinh chất", "concentrate", "essence"],
+      },
+      {
+        keywords: ["da khô", "khô", "dry"],
+        productTypes: ["dưỡng ẩm", "hydrating", "moisturizing", "ceramide"],
+      },
+      {
+        keywords: ["da dầu", "dầu", "oily"],
+        productTypes: ["kiểm soát dầu", "oil control", "matte", "sebum"],
+      },
+      {
+        keywords: ["da nhạy cảm", "nhạy cảm", "sensitive"],
+        productTypes: ["nhạy cảm", "sensitive", "gentle", "hypoallergenic"],
+      },
+    ];
+
+    return semanticMappings.some(
+      (mapping) =>
+        mapping.keywords.some((keyword) => message.includes(keyword)) &&
+        mapping.productTypes.some(
+          (type) =>
+            productName.includes(type) ||
+            productDesc.includes(type) ||
+            productCategory.includes(type)
+        )
+    );
+  }
+
+  /**
+   * Tính điểm độ phù hợp của sản phẩm với message
+   */
+  private calculateProductRelevanceScore(
+    message: string,
+    product: any
+  ): number {
+    let score = 0;
+    const lowerMessage = message.toLowerCase();
+    const productName = product.name?.toLowerCase() || "";
+    const productDesc = product.description?.toLowerCase() || "";
+    const productCategory = product.category?.toLowerCase() || "";
+
+    // Exact keyword match: +2 điểm
+    const keywords = this.extractProductKeywords(message);
+    const keywordMatches = keywords.filter(
+      (keyword) =>
+        productName.includes(keyword.toLowerCase()) ||
+        productDesc.includes(keyword.toLowerCase()) ||
+        productCategory.includes(keyword.toLowerCase())
+    );
+    score += keywordMatches.length * 2;
+
+    // Semantic match: +1 điểm
+    if (this.checkSemanticMatch(lowerMessage, product)) {
+      score += 1;
+    }
+
+    // Category relevance: +0.5 điểm
+    if (productCategory && lowerMessage.includes(productCategory)) {
+      score += 0.5;
+    }
+
+    // Description relevance: +0.3 điểm
+    const messageWords = lowerMessage.split(/\s+/);
+    const descWords = productDesc.split(/\s+/);
+    const commonWords = messageWords.filter(
+      (word) => descWords.includes(word) && word.length > 3
+    );
+    score += commonWords.length * 0.1;
+
+    return Math.min(score, 5); // Cap at 5 points
+  }
+
+  /**
+   * Tạo lý do đề xuất sản phẩm thông minh hơn
+   */
+  private generateSmartReasonForProduct(
+    product: any,
+    userMessage: string
+  ): string {
+    const lowerMessage = userMessage.toLowerCase();
+    const productName = product.name?.toLowerCase() || "";
+    const productCategory = product.category?.toLowerCase() || "";
+
+    // Lý do dựa trên nhu cầu cụ thể
+    if (
+      lowerMessage.includes("da dầu") &&
+      (productName.includes("toner") || productName.includes("gel"))
+    ) {
+      return "✨ Phù hợp cho da dầu, kiểm soát bã nhờn hiệu quả";
+    }
+
+    if (
+      lowerMessage.includes("da khô") &&
+      (productName.includes("kem") || productName.includes("dưỡng"))
+    ) {
+      return "💧 Cung cấp độ ẩm sâu cho da khô";
+    }
+
+    if (
+      lowerMessage.includes("mụn") &&
+      (productName.includes("trị mụn") || productName.includes("acne"))
+    ) {
+      return "🎯 Hiệu quả trong việc điều trị mụn";
+    }
+
+    if (lowerMessage.includes("chống nắng") && productName.includes("spf")) {
+      return "☀️ Bảo vệ da khỏi tia UV có hại";
+    }
+
+    if (lowerMessage.includes("tẩy trang") && productName.includes("tẩy")) {
+      return "🧼 Làm sạch sâu, loại bỏ makeup hiệu quả";
+    }
+
+    if (lowerMessage.includes("serum") && productName.includes("serum")) {
+      return "⚡ Cung cấp dưỡng chất tập trung";
+    }
+
+    if (lowerMessage.includes("dưỡng ẩm") && productName.includes("dưỡng")) {
+      return "💎 Cấp ẩm và nuôi dưỡng da";
+    }
+
+    // Lý do dựa trên category
+    if (productCategory.includes("skincare")) {
+      return "🌟 Sản phẩm chăm sóc da chất lượng";
+    } else if (productCategory.includes("makeup")) {
+      return "💄 Trang điểm tự nhiên, bền màu";
+    } else if (productCategory.includes("serum")) {
+      return "✨ Tinh chất dưỡng da hiệu quả";
+    }
+
+    return "👍 Được nhiều khách hàng tin dùng";
+  }
+
+  /**
    * Tạo lý do đề xuất sản phẩm thông minh
    */
   private generateReasonForProduct(product: any, userMessage: string): string {
@@ -1309,7 +1514,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
   /**
    * Đổi AI provider
    */
-  switchProvider(provider: "openai" | "gemini") {
+  switchProvider(provider: "openrouter" | "gemini") {
     this.currentProvider = provider;
   }
 }
