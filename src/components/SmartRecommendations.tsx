@@ -70,11 +70,8 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
 
   const loadRecommendations = async () => {
     if (!context.userId || currentProducts.length === 0) {
-      // console.log("⏳ Waiting for user ID and products to load...");
       return;
     }
-
-    // console.log("🚀 Starting recommendations load for user:", context.userId);
     setLoading(true);
     setError(null);
 
@@ -85,14 +82,6 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
         favorites: context.favorites,
         searchHistory: context.searchHistory,
       };
-
-      // console.log("🎯 Loading recommendations with context:", {
-      //   userId: context.userId,
-      //   purchaseHistory: context.purchaseHistory?.slice(0, 3),
-      //   recentlyViewed: context.recentlyViewed?.slice(0, 3),
-      //   shownRecommendations: shownRecommendations.slice(0, 3),
-      // });
-
       const recs = await aiService.getSmartRecommendations(
         context.userId,
         currentProducts,
@@ -115,7 +104,6 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
   };
 
   const handleRefresh = () => {
-    // console.log("🔄 Manual refresh triggered");
     // Reset shown recommendations to see the new products
     setShownRecommendations([]);
     loadRecommendations();

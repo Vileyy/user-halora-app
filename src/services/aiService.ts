@@ -221,13 +221,6 @@ Vui lòng đợi 5-10 phút để hệ thống AI hoạt động trở lại! �
         (product) => !excludedIds.has(product.id)
       );
 
-      // console.log("🔍 Generating recommendations:", {
-      //   totalProducts: currentProducts.length,
-      //   availableAfterFilter: availableProducts.length,
-      //   excludedCount: excludedIds.size,
-      //   purchaseHistory: userBehavior.purchaseHistory?.slice(0, 3),
-      // });
-
       // Tạo recommendations dựa trên lịch sử mua hàng
       let recommendations = this.getRecommendationsBasedOnPurchaseHistory(
         availableProducts,
