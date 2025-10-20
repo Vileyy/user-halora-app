@@ -36,6 +36,10 @@ import { SmartRecommendationContext, UserProfile } from "../../types/ai";
 import { getDatabase, ref, onValue } from "firebase/database";
 import VariantSelector, { Variant } from "../../components/VariantSelector";
 import VariantSelectionPopup from "../../components/VariantSelectionPopup";
+import {
+  filterOutOfStockProducts,
+  isProductOutOfStock,
+} from "../../utils/inventoryUtils";
 
 type ProductDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -95,6 +99,9 @@ export default function ProductDetailScreen() {
       : null
   );
 
+  // Check if product is completely out of stock
+  const isOutOfStock = isProductOutOfStock(product);
+
   // AI Recommendation context
   const [recommendationContext, setRecommendationContext] =
     useState<SmartRecommendationContext>({
@@ -119,10 +126,14 @@ export default function ProductDetailScreen() {
     const unsubscribe = onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const productsArray = Object.keys(data).map((key) => ({
+        let productsArray = Object.keys(data).map((key) => ({
           id: key,
           ...data[key],
         }));
+
+        // Filter out products that are completely out of stock (for recommendations)
+        productsArray = filterOutOfStockProducts(productsArray);
+
         setAllProducts(productsArray);
       }
     });
@@ -223,7 +234,7 @@ export default function ProductDetailScreen() {
     addItemToCart({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: product.price || "0",
       description: product.description,
       image: product.image,
       category: product.category,
@@ -385,7 +396,7 @@ export default function ProductDetailScreen() {
     addItemToCart({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: product.price || "0",
       description: product.description,
       image: product.image,
       category: product.category,
@@ -414,7 +425,8 @@ export default function ProductDetailScreen() {
             },
           ],
           totalPrice:
-            parseInt(product.price.toString().replace(/[^\d]/g, "")) * quantity,
+            parseInt((product.price || "0").toString().replace(/[^\d]/g, "")) *
+            quantity,
         });
       },
     });
@@ -481,9 +493,18 @@ export default function ProductDetailScreen() {
         <View style={styles.contentCard}>
           {/* Product Info */}
           <View style={styles.productInfo}>
-            <Text style={styles.productName}>{product.name}</Text>
-            <Text style={styles.productPrice}>{formattedPrice}</Text>
-            {selectedVariant && (
+            <View style={styles.productHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.productName}>{product.name}</Text>
+                <Text style={styles.productPrice}>{formattedPrice}</Text>
+              </View>
+              {isOutOfStock && (
+                <View style={styles.outOfStockBadge}>
+                  <Text style={styles.outOfStockBadgeText}>Hết hàng</Text>
+                </View>
+              )}
+            </View>
+            {selectedVariant && !isOutOfStock && (
               <View style={styles.variantInfo}>
                 <Text style={styles.variantText}>
                   Dung tích: {selectedVariant.size}ml • Còn{" "}
@@ -491,20 +512,29 @@ export default function ProductDetailScreen() {
                 </Text>
               </View>
             )}
-            {product.variants && product.variants.length > 1 && (
-              <TouchableOpacity
-                style={styles.changeVariantButton}
-                onPress={() => {
-                  setVariantActionType("addToCart");
-                  setShowVariantSelector(true);
-                }}
-              >
-                <Text style={styles.changeVariantText}>
-                  Chọn dung tích khác
+            {selectedVariant && isOutOfStock && (
+              <View style={styles.variantInfo}>
+                <Text style={[styles.variantText, { color: "#FF4757" }]}>
+                  ⚠️ Sản phẩm này đã hết hàng ở tất cả kích cỡ
                 </Text>
-                <Ionicons name="chevron-forward" size={16} color="#FF6B7D" />
-              </TouchableOpacity>
+              </View>
             )}
+            {product.variants &&
+              product.variants.length > 1 &&
+              !isOutOfStock && (
+                <TouchableOpacity
+                  style={styles.changeVariantButton}
+                  onPress={() => {
+                    setVariantActionType("addToCart");
+                    setShowVariantSelector(true);
+                  }}
+                >
+                  <Text style={styles.changeVariantText}>
+                    Chọn dung tích khác
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#FF6B7D" />
+                </TouchableOpacity>
+              )}
           </View>
 
           {/* Delivery Info */}
@@ -618,14 +648,32 @@ export default function ProductDetailScreen() {
           <Text style={styles.chatButtonText}>Chat</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.addToCartButton} onPress={onAddToCart}>
+        <TouchableOpacity
+          style={[
+            styles.addToCartButton,
+            isOutOfStock && { opacity: 0.5, backgroundColor: "#ccc" },
+          ]}
+          onPress={onAddToCart}
+          disabled={isOutOfStock}
+        >
           <Ionicons name="cart-outline" size={18} color="#fff" />
-          <Text style={styles.actionButtonText}>Thêm vào giỏ</Text>
+          <Text style={styles.actionButtonText}>
+            {isOutOfStock ? "Hết hàng" : "Thêm vào giỏ"}
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.buyNowButton} onPress={onBuyNow}>
+        <TouchableOpacity
+          style={[
+            styles.buyNowButton,
+            isOutOfStock && { opacity: 0.5, backgroundColor: "#ccc" },
+          ]}
+          onPress={onBuyNow}
+          disabled={isOutOfStock}
+        >
           <Ionicons name="flash-outline" size={18} color="#fff" />
-          <Text style={styles.actionButtonText}>Mua ngay</Text>
+          <Text style={styles.actionButtonText}>
+            {isOutOfStock ? "Hết hàng" : "Mua ngay"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -920,6 +968,25 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#FF6B7D",
     marginBottom: -10,
+  },
+  productHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  outOfStockBadge: {
+    backgroundColor: "#FF4757",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  outOfStockBadgeText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 11,
   },
   variantInfo: {
     marginTop: 8,

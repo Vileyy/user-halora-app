@@ -25,6 +25,7 @@ import {
   getUserPurchaseHistory,
   getUserRecentlyViewed,
 } from "../../services/orderService";
+import { filterOutOfStockProducts } from "../../utils/inventoryUtils";
 
 type HomeNavProp = BottomTabNavigationProp<TabParamList, "HomeScreen">;
 
@@ -79,10 +80,14 @@ export default function HomeScreen() {
     const unsubscribe = onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const productsArray = Object.keys(data).map((key) => ({
+        let productsArray = Object.keys(data).map((key) => ({
           id: key,
           ...data[key],
         }));
+
+        // Filter out products that are completely out of stock
+        productsArray = filterOutOfStockProducts(productsArray);
+
         setProducts(productsArray);
       } else {
         setProducts([]);

@@ -128,8 +128,6 @@ function StripePaymentContent() {
       const init = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
         merchantDisplayName: "Halora Cosmetics",
-        customerId: user?.uid,
-        customerEphemeralKeySecret: undefined,
         defaultBillingDetails: {
           name: user?.displayName || "Customer",
           email: user?.email || "",

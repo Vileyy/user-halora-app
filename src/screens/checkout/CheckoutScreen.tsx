@@ -197,7 +197,6 @@ function CheckoutContent() {
       const init = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
         merchantDisplayName: "Halora Cosmetics",
-        customerId: user?.uid,
         defaultBillingDetails: {
           name: user?.displayName || "Customer",
           email: user?.email || "",

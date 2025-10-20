@@ -15,9 +15,7 @@ export default function App() {
   return (
     <Provider store={store}>
       <StripeProvider
-        publishableKey={
-          process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY
-        }
+        publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}
       >
         <SafeAreaView style={{ flex: 1 }}>
           <AppNavigator />

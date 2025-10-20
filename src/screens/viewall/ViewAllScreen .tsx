@@ -19,6 +19,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../types/navigation";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { Ionicons } from "@expo/vector-icons";
+import { filterOutOfStockProducts } from "../../utils/inventoryUtils";
 
 type ViewAllScreenRouteProp = RouteProp<RootStackParamList, "ViewAllScreen">;
 type ViewAllScreenNavigationProp = StackNavigationProp<
@@ -215,12 +216,15 @@ export default function ViewAllScreen() {
     const unsubscribe = onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const productsArray = Object.keys(data)
+        let productsArray = Object.keys(data)
           .map((key) => ({
             id: key,
             ...data[key],
           }))
           .filter((product) => product.category === category);
+
+        // Filter out products that are completely out of stock
+        productsArray = filterOutOfStockProducts(productsArray);
 
         setProducts(productsArray);
         setFilteredProducts(productsArray);
@@ -808,7 +812,7 @@ const styles = StyleSheet.create({
   },
   productsList: {
     padding: 16,
-    paddingBottom: 185, 
+    paddingBottom: 185,
   },
   row: {
     justifyContent: "space-between",

@@ -12,6 +12,7 @@ import { useNavigation, CommonActions } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types/navigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { filterOutOfStockProducts } from "../utils/inventoryUtils";
 
 const TIMER_DURATION = 2 * 60 * 60; // 2 giờ = 7200 giây
 const TIMER_STORAGE_KEY = "flash_deals_end_time";
@@ -19,7 +20,8 @@ const TIMER_STORAGE_KEY = "flash_deals_end_time";
 interface Variant {
   price: number;
   size: string;
-  stock: number;
+  stockQty: number;
+  sku?: string;
 }
 
 interface FlashDealItem {
@@ -45,12 +47,15 @@ const FlashDeals: React.FC = () => {
     const unsubscribe = onValue(flashDealsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const productsArray = Object.keys(data)
+        let productsArray = Object.keys(data)
           .map((key) => ({
             id: key,
             ...data[key],
           }))
           .filter((product) => product.category === "FlashDeals");
+
+        // Filter out products that are completely out of stock
+        productsArray = filterOutOfStockProducts(productsArray);
 
         setFlashDeals(productsArray);
       }

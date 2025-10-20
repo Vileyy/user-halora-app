@@ -4,6 +4,7 @@ interface UserData {
   uid: string;
   email: string;
   phone?: string;
+  role?: string;
   createdAt: string;
   updatedAt: string;
   displayName?: string;

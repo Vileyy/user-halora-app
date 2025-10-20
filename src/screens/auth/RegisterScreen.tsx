@@ -223,6 +223,7 @@ export default function RegisterScreen() {
         uid: userCredential.user.uid,
         email: email,
         phone: phone,
+        role: "user",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

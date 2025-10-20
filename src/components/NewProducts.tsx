@@ -11,11 +11,13 @@ import { getDatabase, ref, onValue } from "firebase/database";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types/navigation";
+import { filterOutOfStockProducts } from "../utils/inventoryUtils";
 
 interface Variant {
   price: number;
   size: string;
-  stock: number;
+  stockQty: number;
+  sku?: string;
 }
 
 interface NewProductItem {
@@ -40,12 +42,15 @@ const NewProducts: React.FC = () => {
     const unsubscribe = onValue(productsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const productList = Object.keys(data)
+        let productList = Object.keys(data)
           .map((key) => ({
             id: key,
             ...data[key],
           }))
           .filter((item) => item.category === "new_product");
+
+        // Filter out products that are completely out of stock
+        productList = filterOutOfStockProducts(productList);
 
         setProducts(productList);
       } else {

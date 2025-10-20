@@ -15,14 +15,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getDatabase, ref, onValue, off } from "firebase/database";
+import { filterOutOfStockProducts } from "../../utils/inventoryUtils";
 
 interface Product {
   id: string;
   name: string;
-  price: number;
+  price?: string | number;
   image: string;
   description?: string;
   category?: string;
+  variants?: Array<{
+    price: number;
+    size: string;
+    stockQty: number;
+  }>;
 }
 
 interface SearchScreenProps {
@@ -223,12 +229,16 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
       onValue(productsRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.val();
-          const productsArray: Product[] = Object.keys(data)
+          let productsArray: Product[] = Object.keys(data)
             .map((key) => ({
               id: key,
               ...data[key],
             }))
             .filter((item) => item?.image && item?.name);
+
+          // Filter out products that are completely out of stock
+          productsArray = filterOutOfStockProducts(productsArray);
+
           setProducts(productsArray);
           setFilteredProducts(productsArray);
         } else {
@@ -276,6 +286,20 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
     [products]
   );
 
+  // Hàm lấy giá để sắp xếp (ưu tiên variant đầu tiên)
+  const getPriceForSorting = (item: Product): number => {
+    if (item.variants && item.variants.length > 0) {
+      return item.variants[0].price;
+    }
+    if (typeof item.price === "number") {
+      return item.price;
+    }
+    if (typeof item.price === "string") {
+      return parseInt(item.price.toString().replace(/[^\d]/g, ""), 10) || 0;
+    }
+    return 0;
+  };
+
   // Sort products with animation
   const sortProducts = useCallback(
     (type: string) => {
@@ -298,9 +322,9 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
       if (type === "name") {
         sorted.sort((a, b) => a?.name?.localeCompare(b?.name));
       } else if (type === "price_asc") {
-        sorted.sort((a, b) => (a?.price || 0) - (b?.price || 0));
+        sorted.sort((a, b) => getPriceForSorting(a) - getPriceForSorting(b));
       } else if (type === "price_desc") {
-        sorted.sort((a, b) => (b?.price || 0) - (a?.price || 0));
+        sorted.sort((a, b) => getPriceForSorting(b) - getPriceForSorting(a));
       }
 
       setSortType(type);
@@ -340,6 +364,22 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
     ]).start();
 
     navigation.navigate("ProductDetailScreen", { product: item });
+  };
+
+  // Hàm lấy giá hiển thị (ưu tiên variant đầu tiên)
+  const getDisplayPrice = (item: Product): string => {
+    if (item.variants && item.variants.length > 0) {
+      return item.variants[0].price.toLocaleString("vi-VN");
+    }
+    if (typeof item.price === "number") {
+      return item.price.toLocaleString("vi-VN");
+    }
+    if (typeof item.price === "string") {
+      const numPrice =
+        parseInt(item.price.toString().replace(/[^\d]/g, ""), 10) || 0;
+      return numPrice.toLocaleString("vi-VN");
+    }
+    return "0";
   };
 
   const renderProduct = ({ item, index }: { item: Product; index: number }) => {
@@ -386,9 +426,7 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
             >
               {item.name}
             </Text>
-            <Text style={styles.productPrice}>
-              {item.price?.toLocaleString()}₫
-            </Text>
+            <Text style={styles.productPrice}>{getDisplayPrice(item)}₫</Text>
             {item.description && (
               <Text
                 numberOfLines={2}

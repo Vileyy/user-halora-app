@@ -177,9 +177,14 @@ export default function LoginScreen() {
 
         if (snapshot.exists()) {
           const userData = snapshot.val();
-          // console.log("Thông tin user từ database:", userData);
+          // Đảm bảo role luôn có giá trị "user" nếu chưa có
+          const userDataWithRole = {
+            ...userData,
+            role: userData.role || "user",
+          };
+          // console.log("Thông tin user từ database:", userDataWithRole);
           // Lưu thông tin user vào Redux state
-          dispatch(setUser(userData));
+          dispatch(setUser(userDataWithRole));
         }
       } catch (dbError) {
         console.log("Lỗi khi lấy thông tin user từ database:", dbError);
@@ -245,6 +250,7 @@ export default function LoginScreen() {
           photoURL: firebaseUser.photoURL || "",
           provider: "google",
           phone: "",
+          role: "user",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -267,6 +273,7 @@ export default function LoginScreen() {
               existingData.avatar ||
               existingData.photoURL,
             photoURL: firebaseUser.photoURL || existingData.photoURL,
+            role: existingData.role || "user", // Đảm bảo role luôn có giá trị
             updatedAt: new Date().toISOString(),
           };
           await set(userRef, updatedData);

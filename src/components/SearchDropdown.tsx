@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getDatabase, ref, onValue, off } from "firebase/database";
+import { filterOutOfStockProducts } from "../utils/inventoryUtils";
 
 const { width } = Dimensions.get("window");
 
@@ -21,6 +22,11 @@ interface Product {
   image: string;
   description?: string;
   category?: string;
+  variants?: Array<{
+    price: number;
+    size: string;
+    stockQty: number;
+  }>;
 }
 
 interface SearchDropdownProps {
@@ -53,10 +59,14 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
       (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          const productList = Object.keys(data).map((key) => ({
+          let productList = Object.keys(data).map((key) => ({
             id: key,
             ...data[key],
           }));
+
+          // Filter out products that are completely out of stock
+          productList = filterOutOfStockProducts(productList);
+
           setProducts(productList);
         } else {
           setProducts([]);
