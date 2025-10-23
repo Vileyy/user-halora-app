@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   LoginScreen: undefined;
   RegisterScreen: undefined;
+  ForgotPasswordScreen: undefined;
   MainTabs: undefined;
   ProductListScreen: undefined;
   ProductDetailScreen: {

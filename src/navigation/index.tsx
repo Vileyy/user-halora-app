@@ -4,6 +4,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { RootStackParamList } from "../types/navigation";
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
+import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
 import MainTabs from "./tabs/MainTabs";
 import ProductDetailScreen from "../screens/product/ProductDetailScreen";
 import ViewAllScreen from "../screens/viewall/ViewAllScreen ";
@@ -38,6 +39,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="RegisterScreen"
           component={RegisterScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ForgotPasswordScreen"
+          component={ForgotPasswordScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

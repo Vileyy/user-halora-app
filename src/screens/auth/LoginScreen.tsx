@@ -239,7 +239,6 @@ export default function LoginScreen() {
         const credential = GoogleAuthProvider.credential(userInfo.data.idToken);
         const userCredential = await signInWithCredential(auth, credential);
         const firebaseUser = userCredential.user;
-        // console.log("✅ Login thành công:", firebaseUser);
 
         // datadata user
         const userData = {
@@ -273,7 +272,7 @@ export default function LoginScreen() {
               existingData.avatar ||
               existingData.photoURL,
             photoURL: firebaseUser.photoURL || existingData.photoURL,
-            role: existingData.role || "user", // Đảm bảo role luôn có giá trị
+            role: existingData.role || "user",
             updatedAt: new Date().toISOString(),
           };
           await set(userRef, updatedData);
@@ -460,7 +459,10 @@ export default function LoginScreen() {
                 </Animated.View>
               </View>
 
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => navigation.navigate("ForgotPasswordScreen")}
+              >
                 <Text style={styles.forgotPasswordText}>Forgot password ?</Text>
               </TouchableOpacity>
             </View>
