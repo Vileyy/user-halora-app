@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,6 +39,9 @@ import {
 } from "../../utils/userValidation";
 import { stripeService } from "../../services/stripeService";
 import { useStripe, StripeProvider } from "@stripe/stripe-react-native";
+const COD_LOGO = require("../../assets/image/cod-logo.png");
+const MOMO_LOGO = require("../../assets/image/momo-logo.png");
+const STRIPE_LOGO = require("../../assets/image/stripe-logo.png");
 
 type CheckoutScreenRouteProp = RouteProp<RootStackParamList, "CheckoutScreen">;
 type CheckoutScreenNavigationProp = StackNavigationProp<
@@ -780,7 +784,9 @@ function CheckoutContent() {
             }}
           >
             <View style={styles.paymentOptionLeft}>
-              <Ionicons name="cash-outline" size={20} color="#666" />
+              <View style={styles.paymentIconContainer}>
+                <Image source={COD_LOGO} style={styles.paymentLogo} />
+              </View>
               <Text style={styles.paymentOptionTitle}>
                 Thanh toán khi nhận hàng (COD)
               </Text>
@@ -808,7 +814,9 @@ function CheckoutContent() {
             }}
           >
             <View style={styles.paymentOptionLeft}>
-              <Ionicons name="wallet-outline" size={20} color="#666" />
+              <View style={styles.paymentIconContainer}>
+                <Image source={MOMO_LOGO} style={styles.paymentLogo} />
+              </View>
               <Text style={styles.paymentOptionTitle}>Ví MoMo</Text>
             </View>
             <View
@@ -834,7 +842,9 @@ function CheckoutContent() {
             }}
           >
             <View style={styles.paymentOptionLeft}>
-              <Ionicons name="card-outline" size={20} color="#666" />
+              <View style={styles.paymentIconContainer}>
+                <Image source={STRIPE_LOGO} style={styles.paymentLogo} />
+              </View>
               <Text style={styles.paymentOptionTitle}>
                 Thẻ tín dụng/ghi nợ (Stripe)
               </Text>
@@ -1249,11 +1259,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  paymentIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 4,
+  },
+  paymentLogo: {
+    width: 28,
+    height: 28,
+    resizeMode: "contain",
+  },
   paymentOptionTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: "#1a1a1a",
-    marginLeft: 12,
+    marginLeft: 8,
   },
   radioButton: {
     width: 20,
