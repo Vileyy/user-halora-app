@@ -277,9 +277,13 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
       if (text.trim() === "") {
         setFilteredProducts(products);
       } else {
-        const results = products.filter((item) =>
-          item?.name?.toLowerCase().includes(text.toLowerCase())
-        );
+        const results = products.filter((item) => {
+          // Safety check: ensure item.name exists and is a string
+          if (!item || !item.name || typeof item.name !== "string") {
+            return false;
+          }
+          return item.name.toLowerCase().includes(text.toLowerCase());
+        });
         setFilteredProducts(results);
       }
     },
@@ -320,7 +324,11 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
       let sorted = [...filteredProducts];
 
       if (type === "name") {
-        sorted.sort((a, b) => a?.name?.localeCompare(b?.name));
+        sorted.sort((a, b) => {
+          const nameA = a?.name || "";
+          const nameB = b?.name || "";
+          return nameA.localeCompare(nameB);
+        });
       } else if (type === "price_asc") {
         sorted.sort((a, b) => getPriceForSorting(a) - getPriceForSorting(b));
       } else if (type === "price_desc") {

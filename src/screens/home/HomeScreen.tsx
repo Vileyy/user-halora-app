@@ -19,6 +19,7 @@ import Categories from "../../components/Categories";
 import NewProducts from "../../components/NewProducts";
 import SmartRecommendations from "../../components/SmartRecommendations";
 import FloatingChatButton from "../../components/FloatingChatButton";
+import ProductQuickViewPopup from "../../components/ProductQuickViewPopup";
 import { SmartRecommendationContext, UserProfile } from "../../types/ai";
 import { getDatabase, ref, onValue } from "firebase/database";
 import {
@@ -33,6 +34,8 @@ export default function HomeScreen() {
   const navigation = useNavigation<HomeNavProp>();
   const [searchText, setSearchText] = useState("");
   const [products, setProducts] = useState<any[]>([]);
+  const [quickViewProduct, setQuickViewProduct] = useState<any>(null);
+  const [showQuickView, setShowQuickView] = useState(false);
 
   // Lấy thông tin user từ Redux
   const authState = useSelector((state: any) => state.auth);
@@ -198,6 +201,26 @@ export default function HomeScreen() {
     }
   };
 
+  const handleProductLongPress = (product: any) => {
+    setQuickViewProduct(product);
+    setShowQuickView(true);
+  };
+
+  const handleCloseQuickView = () => {
+    setShowQuickView(false);
+    setTimeout(() => setQuickViewProduct(null), 300);
+  };
+
+  const handleViewDetails = () => {
+    handleCloseQuickView();
+    if (quickViewProduct) {
+      (navigation as any).navigate("ProductDetailScreen", {
+        productId: quickViewProduct.id,
+        product: quickViewProduct,
+      });
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#F08080" />
@@ -249,16 +272,17 @@ export default function HomeScreen() {
               product: product,
             });
           }}
+          onProductLongPress={handleProductLongPress}
         />
 
         {/* Flash Deals */}
-        <FlashDeals />
+        <FlashDeals onProductLongPress={handleProductLongPress} />
 
         {/* Categories */}
         <Categories />
 
         {/* New Products */}
-        <NewProducts />
+        <NewProducts onProductLongPress={handleProductLongPress} />
       </ScrollView>
 
       {/* Floating AI Chat Button */}
@@ -266,6 +290,14 @@ export default function HomeScreen() {
         userProfile={userProfile}
         onProductRecommend={handleProductRecommend}
         availableProducts={products}
+      />
+
+      {/* Product Quick View Popup */}
+      <ProductQuickViewPopup
+        visible={showQuickView}
+        product={quickViewProduct}
+        onClose={handleCloseQuickView}
+        onViewDetails={handleViewDetails}
       />
     </SafeAreaView>
   );

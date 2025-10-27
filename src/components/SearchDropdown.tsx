@@ -59,10 +59,12 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
       (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          let productList = Object.keys(data).map((key) => ({
-            id: key,
-            ...data[key],
-          }));
+          let productList = Object.keys(data)
+            .map((key) => ({
+              id: key,
+              ...data[key],
+            }))
+            .filter((item) => item && item.name && item.image); // Filter out invalid products
 
           // Filter out products that are completely out of stock
           productList = filterOutOfStockProducts(productList);
@@ -90,23 +92,36 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
     }
 
     const filtered = products
-      .filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchText.toLowerCase()) ||
-          (product.category &&
-            product.category.toLowerCase().includes(searchText.toLowerCase()))
-      )
-      .slice(0, 5); // Limit to 5 results
+      .filter((product) => {
+        // Safety check
+        if (!product || !product.name || typeof product.name !== "string") {
+          return false;
+        }
+
+        const searchLower = searchText.toLowerCase();
+        const nameMatch = product.name.toLowerCase().includes(searchLower);
+        const categoryMatch =
+          product.category &&
+          typeof product.category === "string" &&
+          product.category.toLowerCase().includes(searchLower);
+
+        return nameMatch || categoryMatch;
+      })
+      .slice(0, 4); // Limit to 10 results
 
     setFilteredProducts(filtered);
   }, [searchText, products]);
 
-  const formatPrice = (price: string | number): string => {
-    const priceStr = price?.toString() || "0";
+  // Hàm lấy giá hiển thị (ưu tiên variant đầu tiên)
+  const getDisplayPrice = (item: Product): string => {
+    if (item.variants && item.variants.length > 0) {
+      return `${item.variants[0].price.toLocaleString("vi-VN")}đ`;
+    }
+    const priceStr = item.price?.toString() || "0";
     const priceNumber = parseInt(priceStr.replace(/[^\d]/g, ""));
     return isNaN(priceNumber) || priceNumber === 0
-      ? "0₫"
-      : `${priceNumber.toLocaleString()}₫`;
+      ? "0đ"
+      : `${priceNumber.toLocaleString("vi-VN")}đ`;
   };
 
   const handleProductPress = (product: Product) => {
@@ -130,7 +145,10 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
           <FlatList
             data={filteredProducts}
             keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            contentContainerStyle={styles.flatListContent}
             renderItem={({ item, index }) => (
               <TouchableOpacity
                 style={[
@@ -149,11 +167,8 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
                     {item.name}
                   </Text>
                   <Text style={styles.productPrice}>
-                    {formatPrice(item.price)}
+                    {getDisplayPrice(item)}
                   </Text>
-                  {item.category && (
-                    <Text style={styles.productCategory}>{item.category}</Text>
-                  )}
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#ccc" />
               </TouchableOpacity>
@@ -184,7 +199,8 @@ const styles = StyleSheet.create({
   dropdown: {
     backgroundColor: "white",
     borderRadius: 12,
-    maxHeight: 300,
+    maxHeight: 400,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -195,6 +211,9 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 1,
     borderColor: "#f0f0f0",
+  },
+  flatListContent: {
+    flexGrow: 1,
   },
   loadingContainer: {
     padding: 20,
@@ -239,11 +258,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#F08080",
     marginBottom: 2,
-  },
-  productCategory: {
-    fontSize: 12,
-    color: "#888",
-    textTransform: "capitalize",
   },
   noResultsContainer: {
     padding: 30,

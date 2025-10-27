@@ -24,6 +24,7 @@ interface SmartRecommendationsProps {
   maxItems?: number;
   showReason?: boolean;
   onProductPress?: (product: ProductRecommendation) => void;
+  onProductLongPress?: (product: ProductRecommendation) => void;
 }
 
 const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
@@ -33,6 +34,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
   maxItems = 5,
   showReason = true,
   onProductPress,
+  onProductLongPress,
 }) => {
   const navigation = useNavigation();
   const [recommendations, setRecommendations] = useState<
@@ -143,6 +145,10 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
     <TouchableOpacity
       style={[styles.recommendationCard, { marginLeft: index === 0 ? 16 : 8 }]}
       onPress={() => handleProductPress(item)}
+      onLongPress={() => {
+        onProductLongPress?.(item);
+      }}
+      delayLongPress={500}
       activeOpacity={0.7}
     >
       <View style={styles.imageContainer}>

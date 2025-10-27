@@ -35,7 +35,11 @@ interface FlashDealItem {
   variants?: Variant[];
 }
 
-const FlashDeals: React.FC = () => {
+interface FlashDealsProps {
+  onProductLongPress?: (product: FlashDealItem) => void;
+}
+
+const FlashDeals: React.FC<FlashDealsProps> = ({ onProductLongPress }) => {
   const [flashDeals, setFlashDeals] = useState<FlashDealItem[]>([]);
   const [countdown, setCountdown] = useState(TIMER_DURATION);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -147,7 +151,14 @@ const FlashDeals: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: FlashDealItem }) => (
-    <TouchableOpacity style={styles.card} onPress={() => handlePress(item)}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => handlePress(item)}
+      onLongPress={() => {
+        onProductLongPress?.(item);
+      }}
+      delayLongPress={500}
+    >
       <Image source={{ uri: item.image }} style={styles.image} />
       <View style={styles.infoContainer}>
         <Text style={styles.name}>{item.name}</Text>

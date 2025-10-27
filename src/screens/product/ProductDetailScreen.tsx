@@ -26,6 +26,7 @@ import AuthRequiredModal from "../../components/AuthRequiredModal";
 import UserInfoRequiredModal from "../../components/UserInfoRequiredModal";
 import ProductReviews from "../../components/ProductReviews";
 import SmartRecommendations from "../../components/SmartRecommendations";
+import ProductQuickViewPopup from "../../components/ProductQuickViewPopup";
 import { useCartSync } from "../../hooks/useCartSync";
 import {
   validateUserForOrder,
@@ -98,6 +99,8 @@ export default function ProductDetailScreen() {
         }
       : null
   );
+  const [quickViewProduct, setQuickViewProduct] = useState<any>(null);
+  const [showQuickView, setShowQuickView] = useState(false);
 
   // Check if product is completely out of stock
   const isOutOfStock = isProductOutOfStock(product);
@@ -432,6 +435,25 @@ export default function ProductDetailScreen() {
     });
   };
 
+  const handleProductLongPress = (product: any) => {
+    setQuickViewProduct(product);
+    setShowQuickView(true);
+  };
+
+  const handleCloseQuickView = () => {
+    setShowQuickView(false);
+    setTimeout(() => setQuickViewProduct(null), 300);
+  };
+
+  const handleViewDetails = () => {
+    handleCloseQuickView();
+    if (quickViewProduct) {
+      navigation.push("ProductDetailScreen", {
+        product: quickViewProduct,
+      });
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <StatusBar
@@ -607,11 +629,12 @@ export default function ProductDetailScreen() {
                   },
                 }));
 
-                // Navigate to the recommended product
-                navigation.navigate("ProductDetailScreen", {
+                // Use push() to create new instance of ProductDetailScreen
+                navigation.push("ProductDetailScreen", {
                   product: recommendedProduct,
                 });
               }}
+              onProductLongPress={handleProductLongPress}
             />
           </View>
 
@@ -815,6 +838,14 @@ export default function ProductDetailScreen() {
           })),
         }}
         onConfirm={handleVariantConfirm}
+      />
+
+      {/* Product Quick View Popup */}
+      <ProductQuickViewPopup
+        visible={showQuickView}
+        product={quickViewProduct}
+        onClose={handleCloseQuickView}
+        onViewDetails={handleViewDetails}
       />
     </View>
   );

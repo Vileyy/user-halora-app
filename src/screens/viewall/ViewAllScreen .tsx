@@ -20,6 +20,7 @@ import { RootStackParamList } from "../../types/navigation";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { Ionicons } from "@expo/vector-icons";
 import { filterOutOfStockProducts } from "../../utils/inventoryUtils";
+import ProductQuickViewPopup from "../../components/ProductQuickViewPopup";
 
 type ViewAllScreenRouteProp = RouteProp<RootStackParamList, "ViewAllScreen">;
 type ViewAllScreenNavigationProp = StackNavigationProp<
@@ -61,6 +62,10 @@ export default function ViewAllScreen() {
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [loading, setLoading] = useState(true);
   const [showSortOptions, setShowSortOptions] = useState(false);
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(
+    null
+  );
+  const [showQuickView, setShowQuickView] = useState(false);
 
   // Animation values
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -344,6 +349,33 @@ export default function ViewAllScreen() {
     navigation.navigate("ProductDetailScreen", { product: navProduct });
   };
 
+  const handleProductLongPress = (product: Product) => {
+    setQuickViewProduct(product);
+    setShowQuickView(true);
+  };
+
+  const handleCloseQuickView = () => {
+    setShowQuickView(false);
+    setTimeout(() => setQuickViewProduct(null), 300);
+  };
+
+  const handleViewDetails = () => {
+    handleCloseQuickView();
+    if (quickViewProduct) {
+      const navProduct = {
+        id: quickViewProduct.id,
+        name: quickViewProduct.name,
+        price: quickViewProduct.price || "",
+        description: quickViewProduct.description,
+        image: quickViewProduct.image,
+        category: quickViewProduct.category,
+        brandId: quickViewProduct.brandId,
+        variants: quickViewProduct.variants,
+      };
+      navigation.navigate("ProductDetailScreen", { product: navProduct });
+    }
+  };
+
   const getProductPrice = (product: Product): number => {
     // Nếu có price trực tiếp
     if (product.price) {
@@ -408,6 +440,8 @@ export default function ViewAllScreen() {
       >
         <TouchableOpacity
           onPress={() => handleProductPressWithAnimation(item)}
+          onLongPress={() => handleProductLongPress(item)}
+          delayLongPress={500}
           activeOpacity={0.7}
           style={{ flex: 1 }}
         >
@@ -694,6 +728,14 @@ export default function ViewAllScreen() {
           />
         </Animated.View>
       )}
+
+      {/* Product Quick View Popup */}
+      <ProductQuickViewPopup
+        visible={showQuickView}
+        product={quickViewProduct}
+        onClose={handleCloseQuickView}
+        onViewDetails={handleViewDetails}
+      />
     </SafeAreaView>
   );
 }

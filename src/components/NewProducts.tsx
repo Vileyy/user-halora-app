@@ -31,7 +31,11 @@ interface NewProductItem {
   variants?: Variant[];
 }
 
-const NewProducts: React.FC = () => {
+interface NewProductsProps {
+  onProductLongPress?: (product: NewProductItem) => void;
+}
+
+const NewProducts: React.FC<NewProductsProps> = ({ onProductLongPress }) => {
   const navigation = useNavigation();
   const [products, setProducts] = useState<NewProductItem[]>([]);
 
@@ -76,6 +80,10 @@ const NewProducts: React.FC = () => {
         // console.log("Product pressed:", item);
         (navigation as any).navigate("ProductDetailScreen", { product: item });
       }}
+      onLongPress={() => {
+        onProductLongPress?.(item);
+      }}
+      delayLongPress={500}
     >
       <Image source={{ uri: item.image }} style={styles.productImage} />
       <Text style={styles.productName} numberOfLines={2}>
