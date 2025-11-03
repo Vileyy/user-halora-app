@@ -1,6 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { View, Text, StyleSheet } from "react-native";
 import { TabParamList } from "../../types/navigation";
 import HomeScreen from "../../screens/home/HomeScreen";
 import SearchScreen from "../../screens/search/SearchScreen";
@@ -51,11 +52,20 @@ export default function MainTabs() {
               );
             case "CartScreen":
               return (
-                <Ionicons
-                  name={focused ? "basket" : "basket-outline"}
-                  size={size}
-                  color={color}
-                />
+                <View style={styles.cartIconContainer}>
+                  <Ionicons
+                    name={focused ? "basket" : "basket-outline"}
+                    size={size + 4}
+                    color={color}
+                  />
+                  {cartCount > 0 && (
+                    <View style={styles.cartBadge}>
+                      <Text style={styles.cartBadgeText}>
+                        {cartCount > 99 ? "99+" : cartCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               );
             case "NotifyScreen":
               return (
@@ -96,8 +106,6 @@ export default function MainTabs() {
         component={CartScreen}
         options={{
           title: "Giỏ hàng",
-          tabBarBadge: cartCount > 0 ? cartCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: "#FF6B7D" },
         }}
       />
       <Tab.Screen
@@ -117,3 +125,31 @@ export default function MainTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  cartIconContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartBadge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#FF6B7D",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+    lineHeight: 14,
+  },
+});

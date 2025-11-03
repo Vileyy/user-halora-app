@@ -236,9 +236,9 @@ Bạn cần tư vấn gì hôm nay?`,
                 <View style={styles.productImageContainer}>
                   <Image
                     source={{
-                      uri:
-                        product.image ||
-                        "https://via.placeholder.com/60x60/FF99CC/FFFFFF?text=SP",
+                      uri: product.image
+                        ? product.image
+                        : "https://via.placeholder.com/60x60/FF99CC/FFFFFF?text=SP",
                     }}
                     style={styles.productImage}
                     defaultSource={require("../../assets/image/halora-icon.png")}

@@ -16,6 +16,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getDatabase, ref, onValue, off } from "firebase/database";
 
+interface Variant {
+  price: number;
+  size: string;
+  stock?: number;
+  stockQty?: number;
+  sku?: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -23,6 +31,7 @@ interface Product {
   image: string;
   description?: string;
   category?: string;
+  variants?: Variant[];
 }
 
 interface SearchScreenProps {
@@ -228,7 +237,26 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
               id: key,
               ...data[key],
             }))
-            .filter((item) => item?.image && item?.name);
+            .filter((item) => {
+              // Chỉ hiển thị sản phẩm có image và name
+              if (!item?.image || !item?.name) return false;
+
+              // Kiểm tra stock: nếu có variants, kiểm tra xem có variant nào còn hàng không
+              if (
+                item.variants &&
+                Array.isArray(item.variants) &&
+                item.variants.length > 0
+              ) {
+                // Kiểm tra xem có ít nhất 1 variant còn hàng (stockQty > 0)
+                const hasInStock = item.variants.some(
+                  (variant: any) => (variant.stockQty || variant.stock || 0) > 0
+                );
+                return hasInStock;
+              }
+
+              // Nếu không có variants, vẫn hiển thị (backward compatibility)
+              return true;
+            });
           setProducts(productsArray);
           setFilteredProducts(productsArray);
         } else {
@@ -276,6 +304,14 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
     [products]
   );
 
+  // Helper function to get product price from variants
+  const getProductPrice = (product: Product): number => {
+    if (product.variants && product.variants.length > 0) {
+      return product.variants[0].price;
+    }
+    return product.price || 0;
+  };
+
   // Sort products with animation
   const sortProducts = useCallback(
     (type: string) => {
@@ -298,9 +334,9 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
       if (type === "name") {
         sorted.sort((a, b) => a?.name?.localeCompare(b?.name));
       } else if (type === "price_asc") {
-        sorted.sort((a, b) => (a?.price || 0) - (b?.price || 0));
+        sorted.sort((a, b) => getProductPrice(a) - getProductPrice(b));
       } else if (type === "price_desc") {
-        sorted.sort((a, b) => (b?.price || 0) - (a?.price || 0));
+        sorted.sort((a, b) => getProductPrice(b) - getProductPrice(a));
       }
 
       setSortType(type);
@@ -387,7 +423,7 @@ const SearchScreen = ({ navigation }: SearchScreenProps) => {
               {item.name}
             </Text>
             <Text style={styles.productPrice}>
-              {item.price?.toLocaleString()}₫
+              {getProductPrice(item).toLocaleString("vi-VN")} ₫
             </Text>
             {item.description && (
               <Text

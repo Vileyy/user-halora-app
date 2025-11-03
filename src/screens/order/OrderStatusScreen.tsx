@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   Image,
   StatusBar,
   SafeAreaView,
@@ -23,10 +23,16 @@ const MONEY = (n: number) => `${(n || 0).toLocaleString()}₫`;
 export default function OrderStatusScreen() {
   const navigation = useNavigation<any>();
   const user = useSelector((state: RootState) => state.auth.user);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [displayedOrders, setDisplayedOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     fetchOrders();
@@ -67,11 +73,17 @@ export default function OrderStatusScreen() {
       }
 
       const userOrders = await getUserOrders(user.uid);
-      setOrders(userOrders);
+      setAllOrders(userOrders);
+      setHasMore(userOrders.length > ITEMS_PER_PAGE);
 
-      // Kiểm tra trạng thái đánh giá của các đơn hàng delivered
+      // Chỉ load 10 items đầu tiên
+      const initialOrders = userOrders.slice(0, ITEMS_PER_PAGE);
+      setDisplayedOrders(initialOrders);
+      setCurrentPage(0);
+
+      // Kiểm tra trạng thái đánh giá của các đơn hàng delivered (chỉ cho displayed orders)
       const reviewedSet = new Set<string>();
-      for (const order of userOrders) {
+      for (const order of initialOrders) {
         if (order.status === "delivered" && order.id) {
           const isReviewed = await checkOrderReviewed(order.id);
           if (isReviewed) {
@@ -85,6 +97,44 @@ export default function OrderStatusScreen() {
       setError("Không thể tải danh sách đơn hàng");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load thêm orders khi scroll đến cuối
+  const loadMoreOrders = async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+
+    try {
+      const nextPage = currentPage + 1;
+      const startIndex = nextPage * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const nextOrders = allOrders.slice(startIndex, endIndex);
+
+      if (nextOrders.length > 0) {
+        // Kiểm tra review status cho batch mới
+        const reviewedSet = new Set<string>(reviewedOrders);
+        for (const order of nextOrders) {
+          if (order.status === "delivered" && order.id) {
+            const isReviewed = await checkOrderReviewed(order.id);
+            if (isReviewed) {
+              reviewedSet.add(order.id);
+            }
+          }
+        }
+        setReviewedOrders(reviewedSet);
+
+        setDisplayedOrders((prev) => [...prev, ...nextOrders]);
+        setCurrentPage(nextPage);
+        setHasMore(endIndex < allOrders.length);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more orders:", error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -236,8 +286,132 @@ export default function OrderStatusScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {orders.length === 0 ? (
+      <FlatList
+        data={displayedOrders}
+        renderItem={({ item: order, index }) => (
+          <View key={order.id || index} style={styles.orderCard}>
+            {/* Order Header */}
+            <View style={styles.orderHeader}>
+              <View style={styles.orderInfo}>
+                <Text style={styles.orderDate}>
+                  {formatDate(order.createdAt)}
+                </Text>
+                <Text style={styles.orderId}>
+                  #{order.id?.slice(-6).toUpperCase() || "N/A"}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(order.status) },
+                ]}
+              >
+                <Ionicons
+                  name={getStatusIcon(order.status)}
+                  size={16}
+                  color="white"
+                  style={styles.statusIcon}
+                />
+                <Text style={styles.statusText}>
+                  {getStatusText(order.status)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Product Preview */}
+            {order.items.length > 0 && (
+              <View style={styles.productPreview}>
+                <Image
+                  source={{ uri: order.items[0].image }}
+                  style={styles.productImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {order.items[0].name}
+                  </Text>
+                  {order.items.length > 1 && (
+                    <Text style={styles.moreItems}>
+                      +{order.items.length - 1} sản phẩm khác
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Order Summary */}
+            <View style={styles.orderSummary}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tổng sản phẩm:</Text>
+                <Text style={styles.summaryValue}>
+                  {order.items.length} món
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tổng tiền:</Text>
+                <Text style={styles.totalAmount}>
+                  {MONEY(order.totalAmount)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
+              {order.status === "delivered" ? (
+                order.id && reviewedOrders.has(order.id) ? (
+                  <TouchableOpacity
+                    style={[styles.reviewButton, styles.reviewedButton]}
+                    disabled={true}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color="#95a5a6"
+                    />
+                    <Text
+                      style={[
+                        styles.reviewButtonText,
+                        styles.reviewedButtonText,
+                      ]}
+                    >
+                      Đã đánh giá
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.reviewButton}
+                    onPress={() => handleReviewOrder(order)}
+                  >
+                    <Ionicons name="star-outline" size={16} color="white" />
+                    <Text style={styles.reviewButtonText}>Đánh giá</Text>
+                  </TouchableOpacity>
+                )
+              ) : (
+                <TouchableOpacity
+                  style={styles.contactButton}
+                  onPress={handleContactSupport}
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={16}
+                    color="white"
+                  />
+                  <Text style={styles.contactButtonText}>Liên hệ</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.detailButton}
+                onPress={() => handleOrderPress(order)}
+              >
+                <Ionicons name="eye-outline" size={16} color="white" />
+                <Text style={styles.detailButtonText}>Chi tiết</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        keyExtractor={(item, index) => item.id || index.toString()}
+        contentContainerStyle={styles.container}
+        ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <Ionicons name="receipt-outline" size={80} color="#E0E0E0" />
             <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
@@ -245,130 +419,33 @@ export default function OrderStatusScreen() {
               Bạn chưa có đơn hàng nào. Hãy mua sắm để tạo đơn hàng đầu tiên!
             </Text>
           </View>
-        ) : (
-          orders.map((order, index) => (
-            <View key={order.id || index} style={styles.orderCard}>
-              {/* Order Header */}
-              <View style={styles.orderHeader}>
-                <View style={styles.orderInfo}>
-                  <Text style={styles.orderDate}>
-                    {formatDate(order.createdAt)}
-                  </Text>
-                  <Text style={styles.orderId}>
-                    #{order.id?.slice(-6).toUpperCase() || "N/A"}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(order.status) },
-                  ]}
-                >
-                  <Ionicons
-                    name={getStatusIcon(order.status)}
-                    size={16}
-                    color="white"
-                    style={styles.statusIcon}
-                  />
-                  <Text style={styles.statusText}>
-                    {getStatusText(order.status)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Product Preview */}
-              {order.items.length > 0 && (
-                <View style={styles.productPreview}>
-                  <Image
-                    source={{ uri: order.items[0].image }}
-                    style={styles.productImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.productInfo}>
-                    <Text style={styles.productName} numberOfLines={2}>
-                      {order.items[0].name}
-                    </Text>
-                    {order.items.length > 1 && (
-                      <Text style={styles.moreItems}>
-                        +{order.items.length - 1} sản phẩm khác
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Order Summary */}
-              <View style={styles.orderSummary}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Tổng sản phẩm:</Text>
-                  <Text style={styles.summaryValue}>
-                    {order.items.length} món
-                  </Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Tổng tiền:</Text>
-                  <Text style={styles.totalAmount}>
-                    {MONEY(order.totalAmount)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.actionButtons}>
-                {order.status === "delivered" ? (
-                  order.id && reviewedOrders.has(order.id) ? (
-                    <TouchableOpacity
-                      style={[styles.reviewButton, styles.reviewedButton]}
-                      disabled={true}
-                    >
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={16}
-                        color="#95a5a6"
-                      />
-                      <Text
-                        style={[
-                          styles.reviewButtonText,
-                          styles.reviewedButtonText,
-                        ]}
-                      >
-                        Đã đánh giá
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.reviewButton}
-                      onPress={() => handleReviewOrder(order)}
-                    >
-                      <Ionicons name="star-outline" size={16} color="white" />
-                      <Text style={styles.reviewButtonText}>Đánh giá</Text>
-                    </TouchableOpacity>
-                  )
-                ) : (
-                  <TouchableOpacity
-                    style={styles.contactButton}
-                    onPress={handleContactSupport}
-                  >
-                    <Ionicons
-                      name="chatbubble-ellipses-outline"
-                      size={16}
-                      color="white"
-                    />
-                    <Text style={styles.contactButtonText}>Liên hệ</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.detailButton}
-                  onPress={() => handleOrderPress(order)}
-                >
-                  <Ionicons name="eye-outline" size={16} color="white" />
-                  <Text style={styles.detailButtonText}>Chi tiết</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
         )}
-      </ScrollView>
+        ListFooterComponent={() => {
+          if (loadingMore) {
+            return (
+              <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color="#FF6B7D" />
+                <Text style={styles.loadingMoreText}>
+                  Đang tải thêm đơn hàng...
+                </Text>
+              </View>
+            );
+          }
+          if (hasMore && displayedOrders.length > 0) {
+            return (
+              <View style={styles.loadMoreHint}>
+                <Text style={styles.loadMoreHintText}>
+                  Kéo xuống để xem thêm đơn hàng
+                </Text>
+              </View>
+            );
+          }
+          return null;
+        }}
+        onEndReached={loadMoreOrders}
+        onEndReachedThreshold={0.5}
+        showsVerticalScrollIndicator={false}
+      />
     </SafeAreaView>
   );
 }
@@ -397,7 +474,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 16,
   },
   loadingContainer: {
@@ -621,5 +698,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginLeft: 4,
+  },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  loadMoreHint: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreHintText: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
   },
 });

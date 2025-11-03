@@ -45,7 +45,26 @@ const NewProducts: React.FC = () => {
             id: key,
             ...data[key],
           }))
-          .filter((item) => item.category === "new_product");
+          .filter((item) => {
+            // Chỉ hiển thị sản phẩm có category new_product
+            if (item.category !== "new_product") return false;
+
+            // Kiểm tra stock: nếu có variants, kiểm tra xem có variant nào còn hàng không
+            if (
+              item.variants &&
+              Array.isArray(item.variants) &&
+              item.variants.length > 0
+            ) {
+              // Kiểm tra xem có ít nhất 1 variant còn hàng (stockQty > 0)
+              const hasInStock = item.variants.some(
+                (variant: any) => (variant.stockQty || variant.stock || 0) > 0
+              );
+              return hasInStock;
+            }
+
+            // Nếu không có variants, vẫn hiển thị (backward compatibility)
+            return true;
+          });
 
         setProducts(productList);
       } else {

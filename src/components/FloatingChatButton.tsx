@@ -135,7 +135,7 @@ const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
       <View
         style={[
           styles.container,
-          { bottom: keyboardHeight > 0 ? keyboardHeight + 20 : 100 },
+          { bottom: keyboardHeight > 0 ? keyboardHeight + 20 : 55 },
         ]}
       >
         {/* Pulse ring effect */}

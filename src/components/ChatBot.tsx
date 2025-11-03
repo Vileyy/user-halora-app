@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -46,14 +46,106 @@ const ChatBot: React.FC<ChatBotProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const recordingAnim = useRef(new Animated.Value(1)).current;
 
-  // Quick reply suggestions
-  const [quickReplies] = useState([
-    "Tôi muốn tư vấn về skincare",
-    "Sản phẩm nào phù hợp với da dầu?",
-    "Cách chăm sóc da khô?",
-    "Routine chăm sóc da buổi sáng",
-    "Sản phẩm trị mụn hiệu quả",
-  ]);
+  // Helper function to get valid image URL
+  const getValidImageUrl = (imageUrl: string | null | undefined): string => {
+    if (
+      imageUrl &&
+      typeof imageUrl === "string" &&
+      imageUrl !== "null" &&
+      imageUrl.trim() !== ""
+    ) {
+      return imageUrl;
+    }
+    return "https://via.placeholder.com/60x60/FF99CC/FFFFFF?text=SP";
+  };
+
+  // Smart suggested questions based on available products and user profile
+  const quickReplies = useMemo(() => {
+    return generateSmartSuggestedQuestions(availableProducts, userProfile);
+  }, [availableProducts, userProfile]);
+
+  // Generate smart suggested questions
+  function generateSmartSuggestedQuestions(
+    products: any[],
+    profile?: UserProfile
+  ): string[] {
+    const suggestions: string[] = [];
+
+    // Analyze available products to create context-aware suggestions
+    if (products && products.length > 0) {
+      const categories = new Set<string>();
+      const keywords = new Set<string>();
+
+      products.slice(0, 20).forEach((product) => {
+        if (product.category) categories.add(product.category.toLowerCase());
+        if (product.name) {
+          const name = product.name.toLowerCase();
+          if (name.includes("serum")) keywords.add("serum");
+          if (name.includes("toner")) keywords.add("toner");
+          if (name.includes("kem") || name.includes("cream"))
+            keywords.add("kem dưỡng");
+          if (name.includes("tẩy trang") || name.includes("cleanser"))
+            keywords.add("tẩy trang");
+          if (name.includes("chống nắng") || name.includes("sunscreen"))
+            keywords.add("chống nắng");
+          if (name.includes("mụn") || name.includes("acne"))
+            keywords.add("mụn");
+        }
+      });
+
+      // Generate suggestions based on available products
+      if (keywords.has("serum")) {
+        suggestions.push("Serum nào phù hợp với da của tôi?");
+      }
+      if (keywords.has("tẩy trang")) {
+        suggestions.push("Cách chọn sản phẩm tẩy trang phù hợp?");
+      }
+      if (keywords.has("kem dưỡng")) {
+        suggestions.push("Kem dưỡng ẩm nào tốt?");
+      }
+      if (keywords.has("chống nắng")) {
+        suggestions.push("Kem chống nắng nào phù hợp?");
+      }
+      if (keywords.has("mụn")) {
+        suggestions.push("Sản phẩm trị mụn hiệu quả?");
+      }
+    }
+
+    // Add profile-based suggestions
+    if (profile?.skinType) {
+      suggestions.push(`Routine chăm sóc da ${profile.skinType} như thế nào?`);
+    } else {
+      suggestions.push("Tôi muốn tư vấn về skincare");
+    }
+
+    if (profile?.concerns && profile.concerns.length > 0) {
+      const mainConcern = profile.concerns[0];
+      suggestions.push(`Sản phẩm nào giúp ${mainConcern}?`);
+    } else {
+      suggestions.push("Sản phẩm nào phù hợp với da của tôi?");
+    }
+
+    // Fill remaining slots with general suggestions
+    const defaultSuggestions = [
+      "Cách chăm sóc da buổi sáng",
+      "Routine skincare tối thiểu",
+    ];
+
+    // Remove duplicates and limit to 5
+    const uniqueSuggestions = Array.from(
+      new Set([...suggestions, ...defaultSuggestions])
+    ).slice(0, 5);
+
+    return uniqueSuggestions.length > 0
+      ? uniqueSuggestions
+      : [
+          "Tôi muốn tư vấn về skincare",
+          "Sản phẩm nào phù hợp với da dầu?",
+          "Cách chăm sóc da khô?",
+          "Routine chăm sóc da buổi sáng",
+          "Sản phẩm trị mụn hiệu quả",
+        ];
+  }
 
   useEffect(() => {
     setIsVisible(true);
@@ -203,6 +295,8 @@ Bạn cần tư vấn gì hôm nay?`,
   };
 
   const handleQuickReply = (reply: string) => {
+    // Simply call handleSendMessage like the original behavior
+    // This will show user message first, then typing indicator, then AI response with products
     handleSendMessage(reply);
   };
 
@@ -386,9 +480,7 @@ Bạn cần tư vấn gì hôm nay?`,
                 <View style={styles.productImageContainer}>
                   <Image
                     source={{
-                      uri:
-                        product.image ||
-                        "https://via.placeholder.com/60x60/FF99CC/FFFFFF?text=SP",
+                      uri: getValidImageUrl(product.image),
                     }}
                     style={styles.productImage}
                     defaultSource={require("../assets/image/halora-icon.png")}

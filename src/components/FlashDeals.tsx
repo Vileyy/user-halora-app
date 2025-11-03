@@ -52,7 +52,26 @@ const FlashDeals: React.FC = () => {
             id: key,
             ...data[key],
           }))
-          .filter((product) => product.category === "FlashDeals");
+          .filter((product) => {
+            // Chỉ hiển thị sản phẩm có category FlashDeals
+            if (product.category !== "FlashDeals") return false;
+
+            // Kiểm tra stock: nếu có variants, kiểm tra xem có variant nào còn hàng không
+            if (
+              product.variants &&
+              Array.isArray(product.variants) &&
+              product.variants.length > 0
+            ) {
+              // Kiểm tra xem có ít nhất 1 variant còn hàng (stockQty > 0)
+              const hasInStock = product.variants.some(
+                (variant: any) => (variant.stockQty || variant.stock || 0) > 0
+              );
+              return hasInStock;
+            }
+
+            // Nếu không có variants, vẫn hiển thị (backward compatibility)
+            return true;
+          });
 
         setFlashDeals(productsArray);
       }

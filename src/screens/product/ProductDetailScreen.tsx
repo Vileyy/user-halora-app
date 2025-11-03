@@ -604,7 +604,7 @@ export default function ProductDetailScreen() {
           style={styles.floatingCart}
           onPress={() => navigation.navigate("CartScreen" as never)}
         >
-          <Ionicons name="cart" size={20} color="#fff" />
+          <Ionicons name="cart" size={24} color="#fff" />
           <View style={styles.floatingCartBadge}>
             <Text style={styles.floatingCartText}>{totalCartItems}</Text>
           </View>
@@ -1056,35 +1056,37 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 16,
     bottom: 100,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#FF6B7D",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 5,
+    elevation: 6,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   floatingCartBadge: {
     position: "absolute",
     top: -2,
     right: -2,
     backgroundColor: "#FF4757",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: 11,
+    minWidth: 22,
+    height: 22,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     borderColor: "#fff",
+    paddingHorizontal: 4,
   },
   floatingCartText: {
     color: "#fff",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "bold",
+    lineHeight: 15,
   },
 
   // Bottom Action Bar

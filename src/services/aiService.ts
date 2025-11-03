@@ -108,18 +108,117 @@ class AIService {
           ),
         };
       } else {
-        throw new Error("All AI APIs failed, using offline advice");
-      }
-    } catch (error) {
-      console.error("AI Service Error:", error);
-      return {
-        advice: this.getOfflineAdvice(userMessage),
-        recommendedProducts: this.findMatchingProducts(
+        // Không throw error, chỉ return offline advice với products
+        // Tìm sản phẩm phù hợp trước
+        const matchingProducts = this.findMatchingProducts(
           userMessage,
           availableProducts || []
-        ),
+        );
+
+        // Nếu có sản phẩm phù hợp, dùng smart offline advice (không log error)
+        if (matchingProducts.length > 0) {
+          // console.log("ℹ️ AI APIs unavailable, using smart offline recommendations with products");
+          return {
+            advice: this.getSmartOfflineAdvice(userMessage, matchingProducts),
+            recommendedProducts: matchingProducts,
+          };
+        }
+
+        // Chỉ log warning khi không có products
+        console.warn("⚠️ AI APIs unavailable and no matching products found");
+        return {
+          advice: this.getOfflineAdvice(userMessage),
+          recommendedProducts: matchingProducts,
+        };
+      }
+    } catch (error) {
+      // Chỉ log error khi có exception thực sự (network error, etc.)
+      // Nhưng vẫn cố gắng trả về products nếu có
+      console.error("AI Service Error:", error);
+
+      const matchingProducts = this.findMatchingProducts(
+        userMessage,
+        availableProducts || []
+      );
+
+      // Nếu có sản phẩm phù hợp, vẫn trả về smart offline advice
+      if (matchingProducts.length > 0) {
+        return {
+          advice: this.getSmartOfflineAdvice(userMessage, matchingProducts),
+          recommendedProducts: matchingProducts,
+        };
+      }
+
+      return {
+        advice: this.getOfflineAdvice(userMessage),
+        recommendedProducts: matchingProducts,
       };
     }
+  }
+
+  /**
+   * Smart offline advice khi có sản phẩm phù hợp
+   */
+  private getSmartOfflineAdvice(
+    userMessage: string,
+    matchingProducts: ProductRecommendation[]
+  ): string {
+    const lowerMessage = userMessage.toLowerCase();
+    const productNames = matchingProducts
+      .slice(0, 3)
+      .map((p) => p.name)
+      .join(", ");
+
+    // Tư vấn dựa trên nhu cầu cụ thể
+    if (lowerMessage.includes("da dầu") || lowerMessage.includes("da nhờn")) {
+      return `✨ **Tư vấn cho da dầu:**
+
+Tôi đã tìm thấy những sản phẩm phù hợp với da dầu của bạn! Các sản phẩm được gợi ý đã được lựa chọn dựa trên công thức giúp kiểm soát dầu, thu nhỏ lỗ chân lông và giữ cho da sạch sẽ.
+
+**Gợi ý routine:**
+• Sáng: Sữa rửa mặt → Toner → Serum → Kem dưỡng (texture nhẹ) → Chống nắng
+• Tối: Tẩy trang → Sữa rửa mặt → Toner → Serum → Kem dưỡng
+
+Hãy xem các sản phẩm phù hợp bên dưới nhé! 💫`;
+    }
+
+    if (lowerMessage.includes("da khô")) {
+      return `💧 **Tư vấn cho da khô:**
+
+Tôi đã chọn những sản phẩm giàu dưỡng ẩm cho da khô của bạn! Các sản phẩm này sẽ giúp cung cấp độ ẩm và khóa ẩm hiệu quả.
+
+**Gợi ý routine:**
+• Sáng: Sữa rửa mặt dịu nhẹ → Toner → Serum cấp ẩm → Kem dưỡng giàu ceramide → Chống nắng
+• Tối: Tẩy trang dầu → Sữa rửa mặt → Toner → Serum → Kem dưỡng dưỡng ẩm đậm đặc
+
+Xem ngay các sản phẩm được gợi ý! 🌟`;
+    }
+
+    if (lowerMessage.includes("mụn") || lowerMessage.includes("acne")) {
+      return `🎯 **Tư vấn trị mụn:**
+
+Tôi đã tìm thấy các sản phẩm hỗ trợ điều trị mụn hiệu quả! Các sản phẩm này chứa các thành phần như salicylic acid, benzoyl peroxide, hoặc tea tree oil.
+
+**Lưu ý:**
+• Sử dụng nhẹ nhàng, không chà xát mạnh
+• Kết hợp với kem dưỡng ẩm để tránh khô da
+• Luôn dùng chống nắng ban ngày
+• Kiên nhẫn, kết quả thường thấy sau 4-6 tuần
+
+Các sản phẩm được đề xuất phù hợp với nhu cầu của bạn! ✨`;
+    }
+
+    // Default smart advice
+    return `💡 **Tư vấn chuyên biệt:**
+
+Dựa trên yêu cầu của bạn, tôi đã tìm thấy những sản phẩm phù hợp! Mặc dù hệ thống AI đang tạm thời không khả dụng, nhưng các sản phẩm được gợi ý đã được lựa chọn thông minh dựa trên:
+
+✅ Nhu cầu cụ thể của bạn
+✅ Loại da và mối quan tâm về da
+✅ Đánh giá từ khách hàng khác
+✅ Công thức và thành phần sản phẩm
+
+Hãy xem ngay các sản phẩm được đề xuất bên dưới để tìm được sản phẩm phù hợp nhất! 🌟`;
   }
 
   /**
@@ -643,10 +742,7 @@ Trả lời bằng tiếng Việt, ngắn gọn nhưng đầy đủ thông tin.`
           id: product.id,
           name: product.name,
           price: this.getFirstVariantPrice(product),
-          image:
-            product.image ||
-            product.images?.[0] ||
-            this.generatePlaceholderImage(product.name),
+          image: this.getValidImageUrl(product),
           description: product.description || "",
           category: product.category || "",
           reason: `Phù hợp với ${skinType}`,
@@ -680,10 +776,7 @@ Trả lời bằng tiếng Việt, ngắn gọn nhưng đầy đủ thông tin.`
           id: product.id,
           name: product.name,
           price: this.getFirstVariantPrice(product),
-          image:
-            product.image ||
-            product.images?.[0] ||
-            this.generatePlaceholderImage(product.name),
+          image: this.getValidImageUrl(product),
           description: product.description || "",
           category: product.category || "",
           reason: `Giải quyết vấn đề: ${matchedConcerns.join(", ")}`,
@@ -729,10 +822,7 @@ Trả lời bằng tiếng Việt, ngắn gọn nhưng đầy đủ thông tin.`
           id: selectedProduct.id,
           name: selectedProduct.name,
           price: this.getFirstVariantPrice(selectedProduct),
-          image:
-            selectedProduct.image ||
-            selectedProduct.images?.[0] ||
-            this.generatePlaceholderImage(selectedProduct.name),
+          image: this.getValidImageUrl(selectedProduct),
           description: selectedProduct.description || "",
           category: selectedProduct.category || "",
           reason: `Dựa trên tìm kiếm: "${searchTerm}"`,
@@ -954,10 +1044,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
           id: selectedProduct.id,
           name: selectedProduct.name,
           price: this.getFirstVariantPrice(selectedProduct),
-          image:
-            selectedProduct.image ||
-            selectedProduct.images?.[0] ||
-            this.generatePlaceholderImage(selectedProduct.name),
+          image: this.getValidImageUrl(selectedProduct),
           description: selectedProduct.description || "",
           category: selectedProduct.category || "",
           reason: this.generateNewUserReason(category),
@@ -979,10 +1066,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
           id: product.id,
           name: product.name,
           price: this.getFirstVariantPrice(product),
-          image:
-            product.image ||
-            product.images?.[0] ||
-            this.generatePlaceholderImage(product.name),
+          image: this.getValidImageUrl(product),
           description: product.description || "",
           category: product.category || "",
           reason: "Sản phẩm được yêu thích",
@@ -1190,10 +1274,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
         id: product.id,
         name: product.name,
         price: this.getFirstVariantPrice(product),
-        image:
-          product.image ||
-          product.images?.[0] ||
-          this.generatePlaceholderImage(product.name),
+        image: this.getValidImageUrl(product),
         description: product.description || "",
         category: product.category || "",
         reason: this.generateSmartReasonForProduct(
@@ -1601,10 +1682,7 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
         id: product.id,
         name: product.name,
         price: this.getFirstVariantPrice(product),
-        image:
-          product.image ||
-          product.images?.[0] ||
-          this.generatePlaceholderImage(product.name),
+        image: this.getValidImageUrl(product),
         description: product.description || "",
         category: product.category || "",
         reason: this.generatePurchaseBasedReason(referenceProduct, product),
@@ -1841,6 +1919,46 @@ Kem dưỡng ẩm Vitamin C - Phù hợp với da khô, bổ sung vitamin - 0.9`
     return `https://via.placeholder.com/300x300/FF99CC/FFFFFF?text=${encodeURIComponent(
       initials
     )}`;
+  }
+
+  /**
+   * Lấy URL hình ảnh hợp lệ từ sản phẩm
+   * Đảm bảo luôn trả về string hợp lệ, không phải null/undefined
+   */
+  private getValidImageUrl(product: any): string {
+    if (
+      product?.image &&
+      typeof product.image === "string" &&
+      product.image !== "null" &&
+      product.image.trim() !== ""
+    ) {
+      return product.image;
+    }
+    if (
+      product?.images &&
+      Array.isArray(product.images) &&
+      product.images.length > 0
+    ) {
+      const firstImage = product.images[0];
+      if (
+        typeof firstImage === "string" &&
+        firstImage !== "null" &&
+        firstImage.trim() !== ""
+      ) {
+        return firstImage;
+      }
+    }
+    return this.generatePlaceholderImage(product?.name || "Product");
+  }
+
+  /**
+   * Public method để tìm sản phẩm phù hợp (sử dụng trong ChatBot)
+   */
+  public findMatchingProductsPublic(
+    message: string,
+    availableProducts: any[]
+  ): ProductRecommendation[] {
+    return this.findMatchingProducts(message, availableProducts);
   }
 
   /**

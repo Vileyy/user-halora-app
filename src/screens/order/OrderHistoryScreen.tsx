@@ -48,9 +48,15 @@ interface Order {
 
 const OrderHistoryScreen = () => {
   const navigation = useNavigation<OrderHistoryScreenNavigationProp>();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [displayedOrders, setDisplayedOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const ITEMS_PER_PAGE = 10;
 
   const fetchOrders = () => {
     setLoading(true);
@@ -82,10 +88,43 @@ const OrderHistoryScreen = () => {
         });
       }
 
-      setOrders(orderList);
+      setAllOrders(orderList);
+      setHasMore(orderList.length > ITEMS_PER_PAGE);
+
+      // Chỉ load 10 items đầu tiên (page 0)
+      const initialOrders = orderList.slice(0, ITEMS_PER_PAGE);
+      setDisplayedOrders(initialOrders);
+      setCurrentPage(0); // Page 0 đã được load
+
       setLoading(false);
       setRefreshing(false);
     });
+  };
+
+  // Load thêm orders khi scroll đến cuối
+  const loadMoreOrders = () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+
+    try {
+      const nextPage = currentPage + 1;
+      const startIndex = nextPage * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const nextOrders = allOrders.slice(startIndex, endIndex);
+
+      if (nextOrders.length > 0) {
+        setDisplayedOrders((prev) => [...prev, ...nextOrders]);
+        setCurrentPage(nextPage);
+        setHasMore(endIndex < allOrders.length);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more orders:", error);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const onRefresh = () => {
@@ -278,12 +317,16 @@ const OrderHistoryScreen = () => {
     </View>
   );
 
-  if (loading && !refreshing) {
+  // Hiển thị loading screen khi đang tải lần đầu (không phải khi refresh)
+  if (loading && displayedOrders.length === 0) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="#F9F9F9" />
-        <ActivityIndicator size="large" color="#FF6F61" />
-        <Text style={styles.loadingText}>Đang tải đơn hàng...</Text>
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color="#FF6F61" />
+          <Text style={styles.loadingText}>Đang tải đơn hàng...</Text>
+          <Text style={styles.loadingSubtext}>Vui lòng đợi trong giây lát</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -292,12 +335,30 @@ const OrderHistoryScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F9F9F9" />
       <FlatList
-        data={orders}
+        data={displayedOrders}
         renderItem={renderOrderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyComponent}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMoreContainer}>
+              <ActivityIndicator size="small" color="#FF6F61" />
+              <Text style={styles.loadingMoreText}>
+                Đang tải thêm đơn hàng...
+              </Text>
+            </View>
+          ) : hasMore && displayedOrders.length > 0 ? (
+            <View style={styles.loadMoreHint}>
+              <Text style={styles.loadMoreHintText}>
+                Kéo xuống để xem thêm đơn hàng
+              </Text>
+            </View>
+          ) : null
+        }
+        onEndReached={loadMoreOrders}
+        onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -322,6 +383,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#F9F9F9",
+  },
+  loadingContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#666",
   },
   loadingText: {
     marginTop: 12,
@@ -528,6 +598,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  loadMoreHint: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreHintText: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
   },
 });
 
