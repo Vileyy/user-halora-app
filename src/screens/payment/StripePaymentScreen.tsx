@@ -104,9 +104,10 @@ function StripePaymentContent() {
         setIsProcessing(true);
         const secret = await stripeService.createPaymentIntent(totalPrice);
         setClientSecret(secret);
-      } catch (error) {
-        console.error("Error creating payment intent:", error);
-        Alert.alert("Lỗi", "Không thể khởi tạo thanh toán. Vui lòng thử lại.");
+      } catch (error: any) {
+        const errorMessage =
+          error?.message || "Không thể khởi tạo thanh toán. Vui lòng thử lại.";
+        Alert.alert("Lỗi", errorMessage);
         navigation.goBack();
       } finally {
         setIsProcessing(false);

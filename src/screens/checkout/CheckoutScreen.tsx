@@ -183,9 +183,10 @@ function CheckoutContent() {
     try {
       const clientSecret = await stripeService.createPaymentIntent(amount);
       return clientSecret;
-    } catch (error) {
-      console.error("Error creating payment intent:", error);
-      Alert.alert("Lỗi", "Không thể khởi tạo thanh toán Stripe");
+    } catch (error: any) {
+      const errorMessage =
+        error?.message || "Không thể khởi tạo thanh toán Stripe";
+      Alert.alert("Lỗi", errorMessage);
       return null;
     }
   };
@@ -205,7 +206,6 @@ function CheckoutContent() {
       });
 
       if (init.error) {
-        console.error("Payment sheet init error:", init.error);
         Alert.alert("Lỗi", init.error.message);
         return;
       }
@@ -214,7 +214,11 @@ function CheckoutContent() {
       const result = await presentPaymentSheet();
 
       if (result.error) {
-        console.error("Payment sheet error:", result.error);
+        // User canceled payment - don't show error
+        if (result.error.code === "Canceled") {
+          return;
+        }
+        // Other errors - show alert
         Alert.alert("Thanh toán thất bại", result.error.message);
         return;
       }
@@ -224,7 +228,6 @@ function CheckoutContent() {
         await createStripeOrder();
       }
     } catch (error) {
-      console.error("Stripe payment error:", error);
       Alert.alert("Lỗi", "Có lỗi xảy ra khi xử lý thanh toán");
     }
   };
