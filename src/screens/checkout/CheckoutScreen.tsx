@@ -94,9 +94,7 @@ function CheckoutContent() {
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
     "standard"
   );
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "momo" | "stripe">(
-    "cod"
-  );
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "stripe">("cod");
 
   // Load vouchers
   useEffect(() => {
@@ -394,11 +392,7 @@ function CheckoutContent() {
     Alert.alert(
       "Xác nhận đặt hàng",
       `Tổng tiền: ${MONEY(finalTotal)}\nThanh toán: ${
-        paymentMethod === "cod"
-          ? "COD"
-          : paymentMethod === "momo"
-          ? "MoMo"
-          : "Stripe"
+        paymentMethod === "cod" ? "COD" : "Stripe"
       }`,
       [
         { text: "Hủy", style: "cancel" },
@@ -544,7 +538,14 @@ function CheckoutContent() {
 
   const renderProductItem = (item: CartItem) => (
     <View key={createUniqueKey(item)} style={styles.productItem}>
-      <Image source={{ uri: item.image }} style={styles.productImage} />
+      <Image
+        source={
+          item.image && item.image !== "null"
+            ? { uri: item.image }
+            : require("../../assets/image/halora-icon.png")
+        }
+        style={styles.productImage}
+      />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
@@ -784,7 +785,10 @@ function CheckoutContent() {
             }}
           >
             <View style={styles.paymentOptionLeft}>
-              <Ionicons name="cash-outline" size={20} color="#666" />
+              <Image
+                source={require("../../assets/logo/cod-logo.png")}
+                style={styles.paymentLogo}
+              />
               <Text style={styles.paymentOptionTitle}>
                 Thanh toán khi nhận hàng (COD)
               </Text>
@@ -804,32 +808,6 @@ function CheckoutContent() {
           <TouchableOpacity
             style={[
               styles.paymentOption,
-              paymentMethod === "momo" && styles.paymentOptionSelected,
-            ]}
-            onPress={() => {
-              setPaymentMethod("momo");
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <Ionicons name="wallet-outline" size={20} color="#666" />
-              <Text style={styles.paymentOptionTitle}>Ví MoMo</Text>
-            </View>
-            <View
-              style={[
-                styles.radioButton,
-                paymentMethod === "momo" && styles.radioButtonSelected,
-              ]}
-            >
-              {paymentMethod === "momo" && (
-                <View style={styles.radioButtonInner} />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
               paymentMethod === "stripe" && styles.paymentOptionSelected,
             ]}
             onPress={() => {
@@ -838,10 +816,11 @@ function CheckoutContent() {
             }}
           >
             <View style={styles.paymentOptionLeft}>
-              <Ionicons name="card-outline" size={20} color="#666" />
-              <Text style={styles.paymentOptionTitle}>
-                Thẻ tín dụng/ghi nợ (Stripe)
-              </Text>
+              <Image
+                source={require("../../assets/logo/stripe-logo.png")}
+                style={styles.paymentLogo}
+              />
+              <Text style={styles.paymentOptionTitle}>Thẻ tín dụng Stripe</Text>
             </View>
             <View
               style={[
@@ -1252,6 +1231,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+  },
+  paymentLogo: {
+    width: 24,
+    height: 24,
+    resizeMode: "contain",
   },
   paymentOptionTitle: {
     fontSize: 14,

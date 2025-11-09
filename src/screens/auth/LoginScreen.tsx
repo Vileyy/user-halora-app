@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Modal,
 } from "react-native";
 // @ts-ignore
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -34,6 +35,7 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithCredential,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { ref, get, set } from "firebase/database";
 import { auth, database } from "../../services/firebase";
@@ -61,17 +63,25 @@ export default function LoginScreen() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [resetEmailFocused, setResetEmailFocused] = useState(false);
 
   // Refs for scroll and inputs
   const scrollViewRef = useRef<ScrollView>(null);
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+  const resetEmailInputRef = useRef<TextInput>(null);
 
   // Animated values
   const emailLabelAnim = useRef(new Animated.Value(0)).current;
   const passwordLabelAnim = useRef(new Animated.Value(0)).current;
   const emailBorderAnim = useRef(new Animated.Value(0)).current;
   const passwordBorderAnim = useRef(new Animated.Value(0)).current;
+  const resetEmailLabelAnim = useRef(new Animated.Value(0)).current;
+  const resetEmailBorderAnim = useRef(new Animated.Value(0)).current;
+  const modalAnim = useRef(new Animated.Value(0)).current;
 
   // Google Sign-In
   useEffect(() => {
@@ -117,6 +127,42 @@ export default function LoginScreen() {
       useNativeDriver: false,
     }).start();
   }, [passwordFocused]);
+
+  // Animate reset email label
+  useEffect(() => {
+    Animated.timing(resetEmailLabelAnim, {
+      toValue: resetEmailFocused || resetEmail.length > 0 ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [resetEmailFocused, resetEmail.length]);
+
+  // Animate reset email border
+  useEffect(() => {
+    Animated.timing(resetEmailBorderAnim, {
+      toValue: resetEmailFocused ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [resetEmailFocused]);
+
+  // Animate modal
+  useEffect(() => {
+    if (showForgotPasswordModal) {
+      Animated.spring(modalAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start();
+    } else {
+      Animated.timing(modalAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showForgotPasswordModal]);
 
   // Auto scroll when input is focused
   const handleInputFocus = (inputPosition: number) => {
@@ -170,19 +216,17 @@ export default function LoginScreen() {
         email,
         password
       );
-      console.log("Đăng nhập thành công", userCredential.user);
       try {
         const userRef = ref(database, `users/${userCredential.user.uid}`);
         const snapshot = await get(userRef);
 
         if (snapshot.exists()) {
           const userData = snapshot.val();
-          // console.log("Thông tin user từ database:", userData);
           // Lưu thông tin user vào Redux state
           dispatch(setUser(userData));
         }
       } catch (dbError) {
-        console.log("Lỗi khi lấy thông tin user từ database:", dbError);
+        // Silently handle database error
       }
 
       // Delay 1 giây để hiển thị loading
@@ -199,7 +243,6 @@ export default function LoginScreen() {
         navigation.navigate("MainTabs");
       }, 1000);
     } catch (error: any) {
-      console.log("Đăng nhập thất bại", error);
       setIsLoading(false);
 
       // Hiển thị thông báo lỗi
@@ -225,7 +268,7 @@ export default function LoginScreen() {
       try {
         await GoogleSignin.signOut();
       } catch (signOutError) {
-        console.log("No existing Google session to sign out");
+        // Silently handle sign out error
       }
 
       const userInfo = await GoogleSignin.signIn();
@@ -234,7 +277,6 @@ export default function LoginScreen() {
         const credential = GoogleAuthProvider.credential(userInfo.data.idToken);
         const userCredential = await signInWithCredential(auth, credential);
         const firebaseUser = userCredential.user;
-        // console.log("✅ Login thành công:", firebaseUser);
 
         // datadata user
         const userData = {
@@ -289,7 +331,6 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       dispatch(setGoogleSigningIn(false));
-      console.error("❌ Lỗi đăng nhập:", error);
 
       Toast.show({
         type: "error",
@@ -301,6 +342,60 @@ export default function LoginScreen() {
 
       dispatch(setError(error.message));
     }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!resetEmail.includes("@")) {
+      Toast.show({
+        type: "error",
+        text1: "Lỗi!",
+        text2: "Vui lòng nhập email hợp lệ",
+        position: "top",
+        visibilityTime: 3000,
+      });
+      return;
+    }
+
+    setIsResettingPassword(true);
+
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      Toast.show({
+        type: "success",
+        text1: "Email đã được gửi!",
+        text2: "Vui lòng kiểm tra hộp thư của bạn để đặt lại mật khẩu",
+        position: "top",
+        visibilityTime: 4000,
+      });
+      setShowForgotPasswordModal(false);
+      setResetEmail("");
+    } catch (error: any) {
+      let errorMessage = "Đã có lỗi xảy ra. Vui lòng thử lại.";
+
+      if (error.code === "auth/user-not-found") {
+        errorMessage = "Email này chưa được đăng ký";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Email không hợp lệ";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Quá nhiều yêu cầu. Vui lòng thử lại sau";
+      }
+
+      Toast.show({
+        type: "error",
+        text1: "Lỗi!",
+        text2: errorMessage,
+        position: "top",
+        visibilityTime: 4000,
+      });
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const closeForgotPasswordModal = () => {
+    setShowForgotPasswordModal(false);
+    setResetEmail("");
+    setResetEmailFocused(false);
   };
 
   return (
@@ -453,7 +548,10 @@ export default function LoginScreen() {
                 </Animated.View>
               </View>
 
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => setShowForgotPasswordModal(true)}
+              >
                 <Text style={styles.forgotPasswordText}>Forgot password ?</Text>
               </TouchableOpacity>
             </View>
@@ -523,6 +621,128 @@ export default function LoginScreen() {
             </View>
           </View>
         </ScrollView>
+
+        {/* Forgot Password Modal */}
+        <Modal
+          visible={showForgotPasswordModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeForgotPasswordModal}
+        >
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.modalContainer}
+            >
+              <Animated.View
+                style={[
+                  styles.modalContent,
+                  {
+                    transform: [
+                      {
+                        scale: modalAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.8, 1],
+                        }),
+                      },
+                    ],
+                    opacity: modalAnim,
+                  },
+                ]}
+              >
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Quên mật khẩu</Text>
+                  <TouchableOpacity
+                    onPress={closeForgotPasswordModal}
+                    style={styles.closeButton}
+                  >
+                    <AntDesign name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.modalDescription}>
+                  Nhập email của bạn để nhận link đặt lại mật khẩu
+                </Text>
+
+                <View style={styles.modalInputWrapper}>
+                  <Animated.View
+                    style={[
+                      styles.modalLabelContainer,
+                      {
+                        opacity: resetEmailLabelAnim,
+                        transform: [
+                          {
+                            translateY: resetEmailLabelAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [20, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.modalInputLabel}>Email</Text>
+                  </Animated.View>
+                  <Animated.View
+                    style={[
+                      styles.modalInputContainer,
+                      {
+                        borderColor: resetEmailBorderAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["#E0E0E0", "#FF99CC"],
+                        }),
+                        borderWidth: resetEmailBorderAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 2],
+                        }),
+                      },
+                    ]}
+                  >
+                    <TextInput
+                      ref={resetEmailInputRef}
+                      style={styles.modalInput}
+                      placeholder="Email"
+                      placeholderTextColor="#999"
+                      value={resetEmail}
+                      onChangeText={setResetEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      returnKeyType="done"
+                      onFocus={() => setResetEmailFocused(true)}
+                      onBlur={() => setResetEmailFocused(false)}
+                      onSubmitEditing={handleForgotPassword}
+                      autoFocus={true}
+                    />
+                  </Animated.View>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.resetButton,
+                    isResettingPassword && styles.resetButtonDisabled,
+                  ]}
+                  onPress={handleForgotPassword}
+                  disabled={isResettingPassword}
+                >
+                  {isResettingPassword ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.resetButtonText}>
+                      Gửi email đặt lại
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={closeForgotPasswordModal}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelButtonText}>Hủy</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -758,5 +978,99 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContainer: {
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 25,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 25,
+    lineHeight: 20,
+  },
+  modalInputWrapper: {
+    marginBottom: 20,
+  },
+  modalLabelContainer: {
+    position: "absolute",
+    top: -10,
+    left: 15,
+    backgroundColor: "#fff",
+    paddingHorizontal: 5,
+    zIndex: 1,
+  },
+  modalInputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FF99CC",
+  },
+  modalInputContainer: {
+    borderRadius: 15,
+    marginBottom: 10,
+  },
+  modalInput: {
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    fontSize: 16,
+    backgroundColor: "transparent",
+  },
+  resetButton: {
+    backgroundColor: "#FF99CC",
+    borderRadius: 10,
+    paddingVertical: 15,
+    marginBottom: 15,
+  },
+  resetButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  resetButtonDisabled: {
+    opacity: 0.7,
+  },
+  cancelButton: {
+    paddingVertical: 10,
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+    textAlign: "center",
   },
 });
