@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   ScrollView,
   TouchableOpacity,
   Image,
@@ -20,6 +21,7 @@ import { RootState } from "../../redux/reducers/rootReducer";
 import { getUserReviews, Review } from "../../services/reviewService";
 
 const { width, height } = Dimensions.get("window");
+const ITEMS_PER_PAGE = 5;
 
 interface StarDisplayProps {
   rating: number;
@@ -103,9 +105,13 @@ const ReviewItem: React.FC<{
 export default function UserReviewListScreen() {
   const navigation = useNavigation<any>();
   const user = useSelector((state: RootState) => state.auth.user);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [displayedReviews, setDisplayedReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -125,13 +131,53 @@ export default function UserReviewListScreen() {
         setLoading(true);
       }
 
+      // Fetch all reviews from Firebase
       const userReviews = await getUserReviews(user.uid);
-      setReviews(userReviews);
+
+      // Sort by createdAt (newest first) - should already be sorted but ensure it
+      const sortedReviews = userReviews.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setAllReviews(sortedReviews);
+      setHasMore(sortedReviews.length > ITEMS_PER_PAGE);
+
+      // Chỉ load 5 reviews gần đây nhất (page 0)
+      const initialReviews = sortedReviews.slice(0, ITEMS_PER_PAGE);
+      setDisplayedReviews(initialReviews);
+      setCurrentPage(0);
     } catch (error) {
       console.error("Error loading user reviews:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  // Load thêm reviews khi scroll đến cuối
+  const loadMoreReviews = () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+
+    try {
+      const nextPage = currentPage + 1;
+      const startIndex = nextPage * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const nextReviews = allReviews.slice(startIndex, endIndex);
+
+      if (nextReviews.length > 0) {
+        setDisplayedReviews((prev) => [...prev, ...nextReviews]);
+        setCurrentPage(nextPage);
+        setHasMore(endIndex < allReviews.length);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more reviews:", error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -161,7 +207,8 @@ export default function UserReviewListScreen() {
     });
   };
 
-  if (loading) {
+  // Hiển thị loading screen khi đang tải lần đầu (không phải khi refresh)
+  if (loading && displayedReviews.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -192,15 +239,16 @@ export default function UserReviewListScreen() {
       {/* Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{reviews.length}</Text>
+          <Text style={styles.statNumber}>{allReviews.length}</Text>
           <Text style={styles.statLabel}>Tổng đánh giá</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {reviews.length > 0
+            {allReviews.length > 0
               ? (
-                  reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+                  allReviews.reduce((sum, r) => sum + r.rating, 0) /
+                  allReviews.length
                 ).toFixed(1)
               : "0.0"}
           </Text>
@@ -209,19 +257,15 @@ export default function UserReviewListScreen() {
       </View>
 
       {/* Reviews List */}
-      <ScrollView
-        style={styles.scrollContainer}
+      <FlatList
+        data={displayedReviews}
+        keyExtractor={(item) => item.id || ""}
+        renderItem={({ item }) => (
+          <ReviewItem review={item} onPress={handleReviewPress} />
+        )}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#FF6B7D"]}
-            tintColor="#FF6B7D"
-          />
-        }
-      >
-        {reviews.length === 0 ? (
+        ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="star-outline" size={80} color="#E0E0E0" />
             <Text style={styles.emptyTitle}>Chưa có đánh giá</Text>
@@ -230,18 +274,32 @@ export default function UserReviewListScreen() {
               trải nghiệm!
             </Text>
           </View>
-        ) : (
-          <View style={styles.reviewsList}>
-            {reviews.map((review) => (
-              <ReviewItem
-                key={review.id}
-                review={review}
-                onPress={handleReviewPress}
-              />
-            ))}
-          </View>
-        )}
-      </ScrollView>
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMoreContainer}>
+              <ActivityIndicator size="small" color="#FF6B7D" />
+              <Text style={styles.loadingMoreText}>Đang hiển thị thêm...</Text>
+            </View>
+          ) : hasMore && displayedReviews.length > 0 ? (
+            <View style={styles.loadMoreHint}>
+              <Text style={styles.loadMoreHintText}>
+                Kéo xuống để xem thêm đánh giá
+              </Text>
+            </View>
+          ) : null
+        }
+        onEndReached={loadMoreReviews}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#FF6B7D"]}
+            tintColor="#FF6B7D"
+          />
+        }
+      />
 
       {/* Review Detail Modal */}
       <Modal
@@ -426,9 +484,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#eee",
     marginHorizontal: 20,
   },
-  scrollContainer: {
-    flex: 1,
+  listContent: {
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   emptyContainer: {
     flex: 1,
@@ -450,19 +508,38 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
-  reviewsList: {
-    paddingVertical: 16,
-  },
   reviewItem: {
     backgroundColor: "white",
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginTop: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  loadMoreHint: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreHintText: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
   },
   reviewHeader: {
     flexDirection: "row",

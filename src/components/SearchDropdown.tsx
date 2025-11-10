@@ -11,16 +11,25 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getDatabase, ref, onValue, off } from "firebase/database";
+import { smartSearch } from "../utils/textUtils";
 
 const { width } = Dimensions.get("window");
+
+interface Variant {
+  price: number;
+  size: string;
+  stockQty?: number;
+  stock?: number;
+}
 
 interface Product {
   id: string;
   name: string;
-  price: string;
+  price?: string | number;
   image: string;
   description?: string;
   category?: string;
+  variants?: Variant[] | { [key: string]: Variant };
 }
 
 interface SearchDropdownProps {
@@ -53,10 +62,12 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
       (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          const productList = Object.keys(data).map((key) => ({
-            id: key,
-            ...data[key],
-          }));
+          const productList = Object.keys(data)
+            .map((key) => ({
+              id: key,
+              ...data[key],
+            }))
+            .filter((product) => product && product.name);
           setProducts(productList);
         } else {
           setProducts([]);
@@ -80,23 +91,75 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
     }
 
     const filtered = products
-      .filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchText.toLowerCase()) ||
-          (product.category &&
-            product.category.toLowerCase().includes(searchText.toLowerCase()))
-      )
-      .slice(0, 5); // Limit to 5 results
+      .filter((product) => {
+        // Skip products without a name
+        if (!product?.name) return false;
+
+        const searchTerm = searchText.trim();
+
+        // Tìm kiếm trong tên sản phẩm
+        const nameMatch = smartSearch(product.name, searchTerm);
+
+        // Tìm kiếm trong danh mục
+        const categoryMatch = product.category
+          ? smartSearch(product.category, searchTerm)
+          : false;
+
+        // Tìm kiếm trong mô tả (nếu có)
+        const descriptionMatch = product.description
+          ? smartSearch(product.description, searchTerm)
+          : false;
+
+        return nameMatch || categoryMatch || descriptionMatch;
+      })
+      .slice(0, 3); // Limit to 3 results
 
     setFilteredProducts(filtered);
   }, [searchText, products]);
 
-  const formatPrice = (price: string | number): string => {
-    const priceStr = price?.toString() || "0";
-    const priceNumber = parseInt(priceStr.replace(/[^\d]/g, ""));
-    return isNaN(priceNumber) || priceNumber === 0
-      ? "0₫"
-      : `${priceNumber.toLocaleString()}₫`;
+  // Format price range from variants or single price
+  const formatPriceRange = (product: Product): string => {
+    // Nếu có variants
+    if (product.variants) {
+      let variantsArray: Variant[] = [];
+      if (Array.isArray(product.variants)) {
+        variantsArray = product.variants;
+      } else if (typeof product.variants === "object") {
+        variantsArray = Object.values(product.variants);
+      }
+
+      if (variantsArray.length > 0) {
+        const prices = variantsArray
+          .map((v) => (typeof v === "object" && v.price ? v.price : 0))
+          .filter((p) => p && p > 0);
+
+        if (prices.length === 0) {
+          return "0₫";
+        }
+
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+
+        // Nếu chỉ có 1 giá hoặc min = max, hiển thị 1 giá
+        if (prices.length === 1 || minPrice === maxPrice) {
+          return `${minPrice.toLocaleString()}₫`;
+        }
+
+        // Nếu có nhiều giá khác nhau, hiển thị khoảng giá
+        return `${minPrice.toLocaleString()} - ${maxPrice.toLocaleString()}₫`;
+      }
+    }
+
+    // Nếu không có variants, sử dụng price
+    if (product.price) {
+      const priceStr = product.price.toString();
+      const priceNumber = parseInt(priceStr.replace(/[^\d]/g, ""));
+      return isNaN(priceNumber) || priceNumber === 0
+        ? "0₫"
+        : `${priceNumber.toLocaleString()}₫`;
+    }
+
+    return "0₫";
   };
 
   const handleProductPress = (product: Product) => {
@@ -136,14 +199,11 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
                 />
                 <View style={styles.productInfo}>
                   <Text style={styles.productName} numberOfLines={2}>
-                    {item.name}
+                    {item.name || "Sản phẩm không tên"}
                   </Text>
                   <Text style={styles.productPrice}>
-                    {formatPrice(item.price)}
+                    {formatPriceRange(item)}
                   </Text>
-                  {item.category && (
-                    <Text style={styles.productCategory}>{item.category}</Text>
-                  )}
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#ccc" />
               </TouchableOpacity>
@@ -229,11 +289,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#F08080",
     marginBottom: 2,
-  },
-  productCategory: {
-    fontSize: 12,
-    color: "#888",
-    textTransform: "capitalize",
   },
   noResultsContainer: {
     padding: 30,
