@@ -10,14 +10,17 @@ import {
   Platform,
   Animated,
   ActivityIndicator,
-  Alert,
   Keyboard,
   Image,
+  AppState,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { aiService } from "../services/aiService";
-import { speechService } from "../services/speechService";
 import { ChatMessage, UserProfile } from "../types/ai";
+
+const CHAT_HISTORY_KEY = "chatbot_history";
+const CHAT_SESSION_KEY = "chatbot_session_id";
 
 interface ChatBotProps {
   userProfile?: UserProfile;
@@ -37,14 +40,30 @@ const ChatBot: React.FC<ChatBotProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recording, setRecording] = useState<any>(null);
-  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const recordingAnim = useRef(new Animated.Value(1)).current;
+  const appState = useRef(AppState.currentState);
+
+  // Function để lưu chat history vào AsyncStorage
+  const saveChatHistory = async (messagesToSave: ChatMessage[]) => {
+    try {
+      const currentSessionId = await AsyncStorage.getItem(CHAT_SESSION_KEY);
+      if (currentSessionId) {
+        const historyData = {
+          sessionId: currentSessionId,
+          messages: messagesToSave,
+        };
+        await AsyncStorage.setItem(
+          CHAT_HISTORY_KEY,
+          JSON.stringify(historyData)
+        );
+      }
+    } catch (error) {
+      console.error("Error saving chat history:", error);
+    }
+  };
 
   // Helper function to get valid image URL
   const getValidImageUrl = (imageUrl: string | null | undefined): string => {
@@ -147,7 +166,71 @@ const ChatBot: React.FC<ChatBotProps> = ({
         ];
   }
 
+  // Helper function để tạo welcome message
+  const createWelcomeMessage = (): ChatMessage => ({
+    id: "welcome",
+    text: `Xin chào! 👋 Tôi là trợ lý AI chuyên tư vấn mỹ phẩm của Halora. Tôi có thể giúp bạn:
+
+🌟 Tư vấn sản phẩm phù hợp với làn da
+💄 Hướng dẫn routine chăm sóc da
+🔍 Tìm kiếm sản phẩm theo nhu cầu
+💡 Giải đáp các thắc mắc về skincare
+
+✍️ **Cách sử dụng:**
+- Gõ tin nhắn để chat và nhận tư vấn
+- Chọn câu hỏi gợi ý bên dưới để bắt đầu nhanh
+
+Bạn cần tư vấn gì hôm nay?`,
+    isUser: false,
+    timestamp: new Date(),
+  });
+
+  // Load chat history và check session
   useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        // Lấy session ID hiện tại từ App.tsx
+        const currentSessionId = await AsyncStorage.getItem(CHAT_SESSION_KEY);
+        const savedHistory = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
+
+        if (!currentSessionId) {
+          // Chưa có session, tạo welcome message mới
+          setMessages([createWelcomeMessage()]);
+          return;
+        }
+
+        if (savedHistory) {
+          try {
+            const historyData = JSON.parse(savedHistory);
+            const { sessionId, messages: savedMessages } = historyData;
+
+            // Nếu session ID khác (app được khởi động lại), reset chat
+            if (sessionId !== currentSessionId) {
+              await AsyncStorage.removeItem(CHAT_HISTORY_KEY);
+              setMessages([createWelcomeMessage()]);
+            } else {
+              // Session giống, load lại messages
+              const messagesWithDates = savedMessages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp),
+              }));
+              setMessages(messagesWithDates);
+            }
+          } catch (parseError) {
+            console.error("Error parsing chat history:", parseError);
+            setMessages([createWelcomeMessage()]);
+          }
+        } else {
+          // Không có history, tạo welcome message
+          setMessages([createWelcomeMessage()]);
+        }
+      } catch (error) {
+        console.error("Error loading chat history:", error);
+        setMessages([createWelcomeMessage()]);
+      }
+    };
+
+    loadChatHistory();
     setIsVisible(true);
 
     Animated.parallel([
@@ -162,29 +245,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Message welcome
-    const welcomeMessage: ChatMessage = {
-      id: "welcome",
-      text: `Xin chào! 👋 Tôi là trợ lý AI chuyên tư vấn mỹ phẩm của Halora. Tôi có thể giúp bạn:
-
-🌟 Tư vấn sản phẩm phù hợp với làn da
-💄 Hướng dẫn routine chăm sóc da
-🔍 Tìm kiếm sản phẩm theo nhu cầu
-💡 Giải đáp các thắc mắc về skincare
-
-✍️ **Cách sử dụng:**
-- Gõ tin nhắn để chat bình thường
-- Nhấn nút 🎤 để thử voice input (demo mode)
-
-🎤 **Voice Demo:** Sau khi "ghi âm", bạn sẽ thấy menu chọn nội dung hoặc nhập tự do.
-
-Bạn cần tư vấn gì hôm nay?`,
-      isUser: false,
-      timestamp: new Date(),
-    };
-
-    setMessages([welcomeMessage]);
 
     // Keyboard event listeners
     const keyboardDidShowListener = Keyboard.addListener(
@@ -206,6 +266,59 @@ Bạn cần tư vấn gì hôm nay?`,
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Lưu chat history mỗi khi messages thay đổi (trừ lần đầu load)
+  const isInitialLoad = useRef(true);
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+
+    // Lưu messages vào AsyncStorage
+    if (messages.length > 0) {
+      saveChatHistory(messages);
+    }
+  }, [messages]);
+
+  // Detect khi app được khởi động lại (từ background -> active)
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // App được mở lại từ background, check session
+        const checkSession = async () => {
+          try {
+            const currentSessionId = await AsyncStorage.getItem(
+              CHAT_SESSION_KEY
+            );
+            const savedHistory = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
+
+            if (savedHistory && currentSessionId) {
+              const historyData = JSON.parse(savedHistory);
+              // Nếu session ID khác, reset chat
+              if (historyData.sessionId !== currentSessionId) {
+                await AsyncStorage.removeItem(CHAT_HISTORY_KEY);
+                setMessages([createWelcomeMessage()]);
+              }
+            }
+          } catch (error) {
+            console.error("Error checking session on app state change:", error);
+          }
+        };
+
+        checkSession();
+      }
+
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
     };
   }, []);
 
@@ -298,128 +411,6 @@ Bạn cần tư vấn gì hôm nay?`,
     // Simply call handleSendMessage like the original behavior
     // This will show user message first, then typing indicator, then AI response with products
     handleSendMessage(reply);
-  };
-
-  // Voice Recording Functions
-  const startRecording = async () => {
-    try {
-      // Request permissions
-      const hasPermission = await speechService.requestPermissions();
-      if (!hasPermission) {
-        Alert.alert(
-          "Quyền truy cập microphone",
-          "Ứng dụng cần quyền truy cập microphone để ghi âm tin nhắn voice.",
-          [{ text: "OK" }]
-        );
-        return;
-      }
-
-      // Start recording
-      const newRecording = await speechService.startRecording();
-
-      setRecording(newRecording);
-      setIsRecording(true);
-
-      // Start recording animation
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(recordingAnim, {
-            toValue: 0.3,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(recordingAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } catch (error) {
-      console.error("Failed to start recording:", error);
-      Alert.alert("Lỗi", "Không thể bắt đầu ghi âm. Vui lòng thử lại.");
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return;
-
-    try {
-      setIsRecording(false);
-      setIsProcessingVoice(true);
-
-      // Stop recording animation
-      recordingAnim.stopAnimation();
-      recordingAnim.setValue(1);
-
-      const uri = await speechService.stopRecording(recording);
-
-      if (uri) {
-        // Process the audio file with speech-to-text
-        await processVoiceMessage(uri);
-      }
-
-      setRecording(null);
-    } catch (error) {
-      console.error("Failed to stop recording:", error);
-      Alert.alert("Lỗi", "Không thể hoàn thành ghi âm. Vui lòng thử lại.");
-    } finally {
-      setIsProcessingVoice(false);
-    }
-  };
-
-  const processVoiceMessage = async (audioUri: string) => {
-    try {
-      // Convert speech to text using speech service
-      const transcribedText = await speechService.speechToText(audioUri);
-
-      if (transcribedText && transcribedText.trim()) {
-        // Auto-send the transcribed text as message
-        await handleSendMessage(transcribedText);
-      } else {
-        Alert.alert(
-          "Không thể nhận diện giọng nói",
-          "Vui lòng thử nói rõ hơn hoặc nhập tin nhắn text.",
-          [
-            {
-              text: "Nhập tin nhắn",
-              onPress: () => {
-                // Focus on text input
-                setTimeout(() => {
-                  // You can add auto-focus logic here
-                }, 100);
-              },
-            },
-            { text: "Thử lại", onPress: startRecording },
-          ]
-        );
-      }
-    } catch (error) {
-      console.error("Failed to process voice message:", error);
-      Alert.alert(
-        "Lỗi xử lý giọng nói",
-        "Không thể chuyển đổi giọng nói thành văn bản. Vui lòng thử lại hoặc nhập tin nhắn text.",
-        [
-          {
-            text: "Nhập tin nhắn",
-            style: "default",
-          },
-          {
-            text: "Thử lại",
-            onPress: startRecording,
-            style: "default",
-          },
-        ]
-      );
-    }
-  };
-
-  const handleVoicePress = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
   };
 
   const handleClose = () => {
@@ -528,19 +519,6 @@ Bạn cần tư vấn gì hôm nay?`,
     </View>
   );
 
-  const renderRecordingIndicator = () => (
-    <View style={styles.recordingContainer}>
-      <View style={styles.recordingIndicator}>
-        <Animated.View
-          style={[styles.recordingDot, { opacity: recordingAnim }]}
-        />
-        <Text style={styles.recordingText}>
-          🎤 Đang ghi âm (Demo)... Nhấn nút đỏ để dừng
-        </Text>
-      </View>
-    </View>
-  );
-
   const renderQuickReplies = () => (
     <View style={styles.quickRepliesContainer}>
       <Text style={styles.quickRepliesTitle}>Gợi ý câu hỏi:</Text>
@@ -589,13 +567,7 @@ Bạn cần tư vấn gì hôm nay?`,
             <View>
               <Text style={styles.headerTitle}>Halora AI Assistant</Text>
               <Text style={styles.headerSubtitle}>
-                {isRecording
-                  ? "🎤 Đang ghi âm..."
-                  : isProcessingVoice
-                  ? "🔄 Đang xử lý voice..."
-                  : isTyping
-                  ? "✍️ Đang trả lời..."
-                  : "💬 Tư vấn viên AI (Voice Demo)"}
+                {isTyping ? "✍️ Đang trả lời..." : "💬 Tư vấn viên AI"}
               </Text>
             </View>
           </View>
@@ -619,9 +591,6 @@ Bạn cần tư vấn gì hôm nay?`,
         {/* Typing Indicator */}
         {isTyping && renderTypingIndicator()}
 
-        {/* Recording Indicator */}
-        {isRecording && renderRecordingIndicator()}
-
         {/* Quick Replies */}
         {messages.length <= 1 && renderQuickReplies()}
 
@@ -632,33 +601,12 @@ Bạn cần tư vấn gì hôm nay?`,
             value={inputText}
             onChangeText={setInputText}
             onFocus={handleInputFocus}
-            placeholder="Nhập câu hỏi của bạn hoặc nhấn mic để ghi âm..."
+            placeholder="Nhập câu hỏi của bạn..."
             placeholderTextColor="#999"
             multiline
             maxLength={500}
-            editable={!isRecording && !isProcessingVoice}
+            editable={!isTyping}
           />
-
-          {/* Voice Recording Button */}
-          <TouchableOpacity
-            style={[
-              styles.voiceButton,
-              isRecording && styles.voiceButtonRecording,
-              isProcessingVoice && styles.voiceButtonProcessing,
-            ]}
-            onPress={handleVoicePress}
-            disabled={isTyping || isProcessingVoice}
-          >
-            {isProcessingVoice ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Ionicons
-                name={isRecording ? "stop" : "mic"}
-                size={20}
-                color="#fff"
-              />
-            )}
-          </TouchableOpacity>
 
           <TouchableOpacity
             style={[
@@ -666,9 +614,7 @@ Bạn cần tư vấn gì hôm nay?`,
               !inputText.trim() && styles.sendButtonDisabled,
             ]}
             onPress={() => handleSendMessage()}
-            disabled={
-              !inputText.trim() || isTyping || isRecording || isProcessingVoice
-            }
+            disabled={!inputText.trim() || isTyping}
           >
             <Ionicons
               name="send"
@@ -810,31 +756,6 @@ const styles = StyleSheet.create({
     color: "#666",
     marginLeft: 8,
   },
-  recordingContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    alignItems: "center",
-  },
-  recordingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f44336",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#fff",
-    marginRight: 8,
-  },
-  recordingText: {
-    fontSize: 12,
-    color: "#fff",
-    fontWeight: "500",
-  },
   quickRepliesContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -928,21 +849,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxHeight: 100,
     marginRight: 8,
-  },
-  voiceButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#4CAF50",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
-  },
-  voiceButtonRecording: {
-    backgroundColor: "#f44336",
-  },
-  voiceButtonProcessing: {
-    backgroundColor: "#FF9800",
   },
   sendButton: {
     width: 40,

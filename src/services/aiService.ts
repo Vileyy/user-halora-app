@@ -25,6 +25,19 @@ export interface BeautyAdviceResponse {
   concerns?: string[];
 }
 
+export interface ProductImageRecognitionResponse {
+  recognizedProduct?: {
+    name: string;
+    brand?: string;
+    category?: string;
+    description?: string;
+  };
+  isFoundInStore: boolean;
+  similarProducts: ProductRecommendation[];
+  message: string;
+  confidence: number;
+}
+
 // AI API configuration
 const AI_API_CONFIG = {
   // OpenAI API
@@ -43,6 +56,7 @@ const AI_API_CONFIG = {
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.EXPO_PUBLIC_OPENROUTER_API_KEY,
     model: "openai/gpt-3.5-turbo",
+    visionModel: "openai/gpt-4o", // Model có hỗ trợ vision (tốt nhất và rẻ nhất)
   },
 };
 
@@ -154,6 +168,742 @@ class AIService {
         recommendedProducts: matchingProducts,
       };
     }
+  }
+
+  /**
+   * Nhận diện sản phẩm từ hình ảnh và tìm sản phẩm tương tự trong cửa hàng
+   */
+  async recognizeProductFromImage(
+    imageUri: string, // URI của ảnh (local file URI hoặc base64)
+    availableProducts?: any[]
+  ): Promise<ProductImageRecognitionResponse> {
+    try {
+      await this.waitForRateLimit();
+
+      // Convert image to base64 nếu cần
+      const base64Image = await this.convertImageToBase64(imageUri);
+
+      if (!base64Image) {
+        throw new Error("Không thể xử lý hình ảnh");
+      }
+
+      // Gọi OpenRouter Vision API để nhận diện sản phẩm
+      const visionResponse = await this.callOpenRouterVision(base64Image);
+
+      let recognizedProduct: {
+        name: string;
+        brand?: string;
+        category?: string;
+        description?: string;
+        productType?: string;
+        ingredients?: string;
+        skinType?: string;
+        color?: string;
+      };
+
+      if (!visionResponse) {
+        // Fallback: Khi Vision API fail, vẫn hiển thị sản phẩm phổ biến
+        // Giống như khi người dùng hỏi bằng text về cách sử dụng sản phẩm
+        console.log(
+          "⚠️ Vision API không trả về response, sử dụng fallback search để hiển thị sản phẩm phổ biến..."
+        );
+
+        if (availableProducts && availableProducts.length > 0) {
+          const fallbackResults = this.fallbackProductSearch(availableProducts);
+          if (fallbackResults.length > 0) {
+            return {
+              isFoundInStore: false,
+              similarProducts: fallbackResults,
+              message:
+                "Đây là một số sản phẩm phổ biến trong cửa hàng mà bạn có thể quan tâm:",
+              confidence: 0.4,
+            };
+          }
+        }
+        return {
+          isFoundInStore: false,
+          similarProducts: [],
+          message:
+            "Xin lỗi, tôi không thể nhận diện sản phẩm trong hình ảnh này. Bạn có thể:\n\n1. Mô tả sản phẩm bằng lời (ví dụ: 'đây là sản phẩm tẩy trang Bioderma')\n2. Hỏi tôi về cách sử dụng sản phẩm (ví dụ: 'cách tẩy trang như thế nào?')",
+          confidence: 0,
+        };
+      }
+
+      // Trích xuất thông tin sản phẩm từ AI response
+      recognizedProduct =
+        this.extractProductInfoFromVisionResponse(visionResponse);
+
+      console.log("🔍 Recognized product:", recognizedProduct);
+
+      // Tìm sản phẩm tương tự trong cửa hàng
+      if (availableProducts && availableProducts.length > 0) {
+        const similarProducts = this.findSimilarProductsFromRecognition(
+          recognizedProduct,
+          availableProducts
+        );
+
+        // Kiểm tra xem có sản phẩm chính xác không
+        const exactMatch = this.findExactProductMatch(
+          recognizedProduct,
+          availableProducts
+        );
+
+        if (exactMatch) {
+          return {
+            recognizedProduct,
+            isFoundInStore: true,
+            similarProducts: [
+              {
+                id: exactMatch.id,
+                name: exactMatch.name,
+                price: this.getFirstVariantPrice(exactMatch),
+                image: this.getValidImageUrl(exactMatch),
+                description: exactMatch.description || "",
+                category: exactMatch.category || "",
+                reason: "Sản phẩm bạn đang tìm kiếm",
+                confidence: 0.95,
+              },
+            ],
+            message: `🎉 Tuyệt vời! Tôi đã tìm thấy sản phẩm "${recognizedProduct.name}" trong cửa hàng của chúng tôi!`,
+            confidence: 0.95,
+          };
+        }
+
+        if (similarProducts.length > 0) {
+          return {
+            recognizedProduct,
+            isFoundInStore: false,
+            similarProducts,
+            message: `🔍 Tôi đã nhận diện được sản phẩm "${recognizedProduct.name}" trong hình ảnh của bạn. Mặc dù chúng tôi chưa có sản phẩm chính xác này, nhưng tôi đã tìm thấy những sản phẩm tương tự có thể phù hợp với bạn:`,
+            confidence: 0.7,
+          };
+        }
+
+        return {
+          recognizedProduct,
+          isFoundInStore: false,
+          similarProducts: [],
+          message: `📸 Tôi đã nhận diện được sản phẩm "${recognizedProduct.name}" trong hình ảnh của bạn. Tuy nhiên, hiện tại chúng tôi chưa có sản phẩm này trong cửa hàng. Bạn có muốn tôi đề xuất các sản phẩm thay thế không?`,
+          confidence: 0.6,
+        };
+      }
+
+      // Nếu không có sản phẩm nào trong cửa hàng
+      return {
+        recognizedProduct,
+        isFoundInStore: false,
+        similarProducts: [],
+        message: `📸 Tôi đã nhận diện được sản phẩm "${recognizedProduct.name}" trong hình ảnh của bạn. Tuy nhiên, hiện tại chúng tôi chưa có sản phẩm này trong cửa hàng.`,
+        confidence: 0.6,
+      };
+    } catch (error) {
+      console.error("Image Recognition Error:", error);
+      return {
+        isFoundInStore: false,
+        similarProducts: [],
+        message:
+          "Xin lỗi, đã xảy ra lỗi khi xử lý hình ảnh. Bạn có thể thử lại hoặc mô tả sản phẩm bằng lời được không?",
+        confidence: 0,
+      };
+    }
+  }
+
+  /**
+   * Convert image URI to base64
+   * Component sẽ convert image thành base64 data URI trước khi gọi method này
+   */
+  private async convertImageToBase64(imageUri: string): Promise<string | null> {
+    try {
+      // Nếu đã là base64 data URI, extract base64 part
+      if (imageUri.startsWith("data:image")) {
+        return imageUri; // Return full data URI để xử lý trong callOpenRouterVision
+      }
+
+      // Nếu là file URI hoặc URL, component cần convert trước
+      // Method này chỉ nhận base64 data URI
+      console.warn(
+        "Image URI should be base64 data URI. Please convert image in component first."
+      );
+      return null;
+    } catch (error) {
+      console.error("Error converting image to base64:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Gọi OpenRouter Vision API để phân tích hình ảnh (GPT-4o, Claude, etc.)
+   */
+  private async callOpenRouterVision(
+    base64Image: string
+  ): Promise<string | null> {
+    const config = AI_API_CONFIG.openrouter;
+
+    if (!config.apiKey) {
+      console.warn("OpenRouter API key not configured");
+      return null;
+    }
+
+    try {
+      // Extract base64 data và mime type
+      let imageData: string;
+      let mimeType: string = "image/jpeg";
+
+      if (base64Image.startsWith("data:image")) {
+        const parts = base64Image.split(",");
+        imageData = parts[1];
+        const mimeMatch = base64Image.match(/data:image\/([^;]+)/);
+        if (mimeMatch) {
+          mimeType = `image/${mimeMatch[1]}`;
+        }
+      } else {
+        imageData = base64Image;
+      }
+
+      // Các vision models có sẵn trên OpenRouter (theo thứ tự ưu tiên)
+      // Lưu ý: Một số model có thể cần payment (402) hoặc không available
+      // Thử các model rẻ hơn trước (gpt-4o-mini), sau đó mới đến các model đắt hơn
+      const visionModels = [
+        "openai/gpt-4o-mini", // Rẻ nhất, hỗ trợ vision tốt
+        "openai/gpt-4o", // Tốt nhất, rẻ, nhanh
+        "openai/gpt-4-turbo", // Hỗ trợ vision
+        "openai/gpt-4-vision-preview", // Dành riêng cho vision
+        "anthropic/claude-3-5-sonnet", // Claude mới nhất, hỗ trợ vision tốt
+        "anthropic/claude-3-haiku", // Claude rẻ nhất, hỗ trợ vision
+        "anthropic/claude-3-sonnet", // Claude, hỗ trợ vision
+        "anthropic/claude-3-opus", // Claude tốt nhất, hỗ trợ vision
+      ];
+
+      const prompt = `Bạn là chuyên gia nhận diện sản phẩm mỹ phẩm. Hãy phân tích hình ảnh này và cung cấp thông tin chi tiết về sản phẩm mỹ phẩm trong ảnh.
+
+QUAN TRỌNG: Hãy đọc kỹ TẤT CẢ các text, logo, và thông tin trên bao bì sản phẩm. Đặc biệt chú ý:
+- Tên thương hiệu (brand name) - thường ở trên cùng hoặc góc trên
+- Tên sản phẩm chính xác - có thể là tiếng Anh hoặc tiếng Việt
+- Loại sản phẩm (tẩy trang, serum, kem dưỡng, toner, etc.)
+- Bất kỳ text nào có thể giúp nhận diện sản phẩm
+
+Hãy trả lời theo format JSON (CHỈ trả về JSON, không thêm text khác):
+{
+  "name": "Tên sản phẩm đầy đủ (ví dụ: Sensibio H2O, Bioderma Sensibio H2O, etc.)",
+  "brand": "Tên thương hiệu chính xác (ví dụ: Bioderma, La Roche-Posay, etc.)",
+  "category": "Loại sản phẩm (skincare/makeup/haircare/bodycare)",
+  "productType": "Loại cụ thể (ví dụ: tẩy trang, micellar water, serum, kem dưỡng, toner, son môi, etc.)",
+  "description": "Mô tả ngắn về sản phẩm dựa trên những gì bạn thấy",
+  "ingredients": "Các thành phần chính nếu có thể đọc được từ bao bì",
+  "skinType": "Loại da phù hợp nếu có thể xác định",
+  "color": "Màu sắc sản phẩm (cho makeup)",
+  "size": "Kích thước/dung tích nếu có thể đọc được"
+}
+
+LƯU Ý: 
+- Nếu thấy text "BIODERMA" hoặc "Bioderma", brand phải là "Bioderma"
+- Nếu thấy "Sensibio H2O" hoặc "SENSIBIO H2O", name phải bao gồm "Sensibio H2O"
+- Nếu thấy "micellar water" hoặc "tẩy trang", productType phải là "tẩy trang" hoặc "micellar water"
+- Hãy đọc TẤT CẢ text trên bao bì, kể cả text nhỏ
+
+Trả lời CHỈ bằng JSON, không thêm giải thích.`;
+
+      // Thử từng model cho đến khi thành công
+      for (const model of visionModels) {
+        try {
+          const payload = {
+            model: model,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: prompt,
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:${mimeType};base64,${imageData}`,
+                    },
+                  },
+                ],
+              },
+            ],
+            max_tokens: 1000,
+            temperature: 0.3,
+          };
+
+          console.log(`📸 Calling OpenRouter Vision API with ${model}...`);
+
+          const response = await axios.post(
+            `${config.baseURL}/chat/completions`,
+            payload,
+            {
+              headers: {
+                Authorization: `Bearer ${config.apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://halora.app", // Optional: for tracking
+                "X-Title": "Halora AI Assistant", // Optional: for tracking
+              },
+              timeout: 30000,
+            }
+          );
+
+          const text =
+            response.data.choices?.[0]?.message?.content ||
+            response.data.choices?.[0]?.text;
+
+          if (text) {
+            console.log(
+              `✅ OpenRouter Vision API (${model}) Response received`
+            );
+            return text;
+          }
+        } catch (modelError: any) {
+          const status = modelError.response?.status;
+          const errorData = modelError.response?.data;
+
+          // Xử lý các lỗi cụ thể
+          if (status === 402) {
+            // Payment Required - không đủ credit hoặc model không available
+            console.warn(
+              `⚠️ OpenRouter Vision model ${model} requires payment (402). Trying next model...`
+            );
+            continue;
+          } else if (status === 400) {
+            // Bad Request - model không hỗ trợ vision hoặc format sai
+            console.warn(
+              `⚠️ OpenRouter Vision model ${model} bad request (400). Trying next model...`
+            );
+            continue;
+          } else if (status === 404) {
+            // Model not found
+            console.warn(
+              `⚠️ OpenRouter Vision model ${model} not found (404). Trying next model...`
+            );
+            continue;
+          } else if (status === 429) {
+            // Rate limit
+            console.warn(
+              `⚠️ OpenRouter Vision model ${model} rate limited (429). Trying next model...`
+            );
+            continue;
+          } else {
+            console.warn(
+              `⚠️ OpenRouter Vision model ${model} failed:`,
+              status || modelError.message
+            );
+            continue;
+          }
+        }
+      }
+
+      console.error("❌ All OpenRouter Vision models failed");
+      console.error("💡 Nguyên nhân có thể:");
+      console.error("   - API key không có đủ credit (402 Payment Required)");
+      console.error(
+        "   - Model không hỗ trợ vision hoặc format sai (400 Bad Request)"
+      );
+      console.error("   - Model không tồn tại (404 Not Found)");
+      console.error("   - Vui lòng kiểm tra tài khoản OpenRouter và thử lại");
+      return null;
+    } catch (error: any) {
+      console.error(
+        "❌ OpenRouter Vision API Error:",
+        error.response?.data || error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Trích xuất thông tin sản phẩm từ Vision API response (OpenRouter)
+   */
+  private extractProductInfoFromVisionResponse(visionResponse: string): {
+    name: string;
+    brand?: string;
+    category?: string;
+    description?: string;
+    productType?: string;
+    ingredients?: string;
+    skinType?: string;
+    color?: string;
+  } {
+    try {
+      // Cố gắng parse JSON từ response
+      const jsonMatch = visionResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const productInfo = JSON.parse(jsonMatch[0]);
+        return {
+          name: productInfo.name || "Sản phẩm không xác định",
+          brand: productInfo.brand,
+          category: productInfo.category,
+          description: productInfo.description,
+          productType: productInfo.productType,
+          ingredients: productInfo.ingredients,
+          skinType: productInfo.skinType,
+          color: productInfo.color,
+        };
+      }
+
+      // Nếu không parse được JSON, extract thông tin từ text
+      const nameMatch = visionResponse.match(
+        /["']name["']:\s*["']([^"']+)["']/i
+      );
+      const brandMatch = visionResponse.match(
+        /["']brand["']:\s*["']([^"']+)["']/i
+      );
+      const categoryMatch = visionResponse.match(
+        /["']category["']:\s*["']([^"']+)["']/i
+      );
+
+      return {
+        name: nameMatch
+          ? nameMatch[1]
+          : this.extractProductNameFromText(visionResponse),
+        brand: brandMatch ? brandMatch[1] : undefined,
+        category: categoryMatch ? categoryMatch[1] : undefined,
+        description: visionResponse.substring(0, 200),
+      };
+    } catch (error) {
+      console.error("Error extracting product info:", error);
+      return {
+        name: this.extractProductNameFromText(visionResponse),
+        description: visionResponse.substring(0, 200),
+      };
+    }
+  }
+
+  /**
+   * Extract product name from text response
+   */
+  private extractProductNameFromText(text: string): string {
+    // Tìm các pattern có thể là tên sản phẩm
+    const patterns = [
+      /sản phẩm[:\s]+([^\n.,]+)/i,
+      /tên[:\s]+([^\n.,]+)/i,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/, // Title case words
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+
+    return "Sản phẩm mỹ phẩm";
+  }
+
+  /**
+   * Tìm sản phẩm chính xác trong cửa hàng
+   */
+  private findExactProductMatch(
+    recognizedProduct: {
+      name: string;
+      brand?: string;
+      category?: string;
+    },
+    availableProducts: any[]
+  ): any | null {
+    const productName = recognizedProduct.name.toLowerCase().trim();
+    const productBrand = recognizedProduct.brand?.toLowerCase().trim();
+
+    console.log("🔍 Searching for exact match:", {
+      name: productName,
+      brand: productBrand,
+    });
+
+    // Tìm sản phẩm có tên giống hoặc gần giống
+    for (const product of availableProducts) {
+      const name = (product.name?.toLowerCase() || "").trim();
+      const brand = (product.brand?.toLowerCase() || "").trim();
+      const description = (product.description?.toLowerCase() || "").trim();
+
+      // 1. Exact match tên sản phẩm
+      if (name === productName) {
+        console.log("✅ Exact name match found:", product.name);
+        return product;
+      }
+
+      // 2. Tên sản phẩm chứa tên được nhận diện hoặc ngược lại
+      if (
+        name.includes(productName) ||
+        productName.includes(name) ||
+        name.split(" ").some((word: string) => productName.includes(word)) ||
+        productName.split(" ").some((word: string) => name.includes(word))
+      ) {
+        // Nếu có brand match, càng chính xác hơn
+        if (productBrand) {
+          if (brand.includes(productBrand) || productBrand.includes(brand)) {
+            console.log("✅ Name + Brand match found:", product.name);
+            return product;
+          }
+        } else {
+          // Nếu không có brand, vẫn match nếu tên giống nhiều
+          const nameWords = productName
+            .split(/\s+/)
+            .filter((w) => w.length > 2);
+          const matchedWords = nameWords.filter(
+            (word) => name.includes(word) || description.includes(word)
+          );
+          if (matchedWords.length >= Math.max(1, nameWords.length * 0.6)) {
+            console.log("✅ Name match found (no brand):", product.name);
+            return product;
+          }
+        }
+      }
+
+      // 3. Match với brand + keywords từ tên
+      if (productBrand && brand) {
+        const brandMatch =
+          brand.includes(productBrand) || productBrand.includes(brand);
+        if (brandMatch) {
+          // Tìm keywords chính từ tên sản phẩm
+          const keyWords = productName
+            .split(/\s+/)
+            .filter((w) => w.length > 3)
+            .slice(0, 3); // Lấy 3 từ khóa chính
+
+          const matchedKeywords = keyWords.filter(
+            (keyword) =>
+              name.includes(keyword) ||
+              description.includes(keyword) ||
+              (product.category?.toLowerCase() || "").includes(keyword)
+          );
+
+          if (matchedKeywords.length >= Math.max(1, keyWords.length * 0.5)) {
+            console.log("✅ Brand + Keywords match found:", product.name);
+            return product;
+          }
+        }
+      }
+
+      // 4. Fuzzy match với các từ khóa chính (tên chứa các từ khóa chính)
+      const nameWords = productName
+        .split(/\s+/)
+        .filter((w) => w.length > 2)
+        .slice(0, 5); // Lấy tối đa 5 từ khóa
+
+      if (nameWords.length > 0) {
+        const matchCount = nameWords.filter(
+          (word) =>
+            name.includes(word) ||
+            description.includes(word) ||
+            (product.category?.toLowerCase() || "").includes(word)
+        ).length;
+
+        // Nếu match >= 70% keywords và có ít nhất 2 keywords match
+        if (
+          matchCount >= Math.max(2, nameWords.length * 0.7) &&
+          matchCount >= 2
+        ) {
+          console.log("✅ Fuzzy match found:", product.name, {
+            matched: matchCount,
+            total: nameWords.length,
+          });
+          return product;
+        }
+      }
+    }
+
+    console.log("❌ No exact match found");
+    return null;
+  }
+
+  /**
+   * Fallback search khi Vision API không hoạt động
+   * Tìm sản phẩm dựa trên keywords phổ biến và ưu tiên các sản phẩm phổ biến
+   */
+  private fallbackProductSearch(
+    availableProducts: any[]
+  ): ProductRecommendation[] {
+    // Keywords ưu tiên cao (các sản phẩm phổ biến nhất)
+    const highPriorityKeywords = [
+      "tẩy trang",
+      "micellar",
+      "cleanser",
+      "nước tẩy trang",
+      "bioderma",
+      "sensibio",
+      "la roche",
+      "vichy",
+    ];
+
+    // Keywords ưu tiên trung bình
+    const mediumPriorityKeywords = [
+      "serum",
+      "kem dưỡng",
+      "moisturizer",
+      "toner",
+      "chống nắng",
+      "sunscreen",
+      "cerave",
+      "neutrogena",
+      "skincare",
+    ];
+
+    // Tìm sản phẩm có keywords trong tên hoặc mô tả
+    const scoredProducts = availableProducts.map((product) => {
+      const name = (product.name?.toLowerCase() || "").trim();
+      const description = (product.description?.toLowerCase() || "").trim();
+      const category = (product.category?.toLowerCase() || "").trim();
+
+      let score = 0;
+
+      // High priority keywords: +3 điểm mỗi keyword
+      for (const keyword of highPriorityKeywords) {
+        if (
+          name.includes(keyword) ||
+          description.includes(keyword) ||
+          category.includes(keyword)
+        ) {
+          score += 3;
+        }
+      }
+
+      // Medium priority keywords: +1 điểm mỗi keyword
+      for (const keyword of mediumPriorityKeywords) {
+        if (
+          name.includes(keyword) ||
+          description.includes(keyword) ||
+          category.includes(keyword)
+        ) {
+          score += 1;
+        }
+      }
+
+      return { product, score };
+    });
+
+    // Sắp xếp theo điểm và lấy top 5-8 sản phẩm
+    const sortedProducts = scoredProducts
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+
+    // Nếu có sản phẩm với điểm cao, chỉ lấy những sản phẩm đó
+    if (sortedProducts.length > 0 && sortedProducts[0].score >= 3) {
+      // Chỉ lấy những sản phẩm có điểm >= 3 (có high priority keyword)
+      const highScoreProducts = sortedProducts.filter(
+        ({ score }) => score >= 3
+      );
+      return highScoreProducts.slice(0, 5).map(({ product }) => ({
+        id: product.id,
+        name: product.name,
+        price: this.getFirstVariantPrice(product),
+        image: this.getValidImageUrl(product),
+        description: product.description || "",
+        category: product.category || "",
+        reason: "Sản phẩm phổ biến trong cửa hàng",
+        confidence: 0.4,
+      }));
+    }
+
+    // Nếu không có sản phẩm điểm cao, lấy top 5 sản phẩm bất kỳ
+    return sortedProducts.slice(0, 5).map(({ product }) => ({
+      id: product.id,
+      name: product.name,
+      price: this.getFirstVariantPrice(product),
+      image: this.getValidImageUrl(product),
+      description: product.description || "",
+      category: product.category || "",
+      reason: "Sản phẩm phổ biến trong cửa hàng",
+      confidence: 0.3,
+    }));
+  }
+
+  /**
+   * Tìm sản phẩm tương tự dựa trên thông tin nhận diện
+   */
+  private findSimilarProductsFromRecognition(
+    recognizedProduct: {
+      name: string;
+      brand?: string;
+      category?: string;
+      productType?: string;
+      description?: string;
+      skinType?: string;
+    },
+    availableProducts: any[]
+  ): ProductRecommendation[] {
+    const recommendations: ProductRecommendation[] = [];
+    const productName = recognizedProduct.name.toLowerCase();
+    const productCategory = recognizedProduct.category?.toLowerCase() || "";
+    const productType = recognizedProduct.productType?.toLowerCase() || "";
+
+    // Tìm sản phẩm cùng category
+    if (productCategory) {
+      const categoryProducts = availableProducts.filter((product) => {
+        const category = product.category?.toLowerCase() || "";
+        return (
+          category.includes(productCategory) ||
+          productCategory.includes(category)
+        );
+      });
+
+      categoryProducts.slice(0, 3).forEach((product) => {
+        recommendations.push({
+          id: product.id,
+          name: product.name,
+          price: this.getFirstVariantPrice(product),
+          image: this.getValidImageUrl(product),
+          description: product.description || "",
+          category: product.category || "",
+          reason: `Cùng danh mục với sản phẩm bạn đang tìm`,
+          confidence: 0.75,
+        });
+      });
+    }
+
+    // Tìm sản phẩm cùng loại (productType)
+    if (productType && recommendations.length < 5) {
+      const typeKeywords = this.getProductTypeKeywords(productType);
+      const typeProducts = availableProducts.filter((product) => {
+        if (recommendations.some((r) => r.id === product.id)) return false;
+
+        const name = product.name?.toLowerCase() || "";
+        const category = product.category?.toLowerCase() || "";
+        return typeKeywords.some(
+          (keyword) => name.includes(keyword) || category.includes(keyword)
+        );
+      });
+
+      typeProducts.slice(0, 5 - recommendations.length).forEach((product) => {
+        recommendations.push({
+          id: product.id,
+          name: product.name,
+          price: this.getFirstVariantPrice(product),
+          image: this.getValidImageUrl(product),
+          description: product.description || "",
+          category: product.category || "",
+          reason: `Sản phẩm ${productType} tương tự`,
+          confidence: 0.7,
+        });
+      });
+    }
+
+    // Tìm sản phẩm phù hợp với skinType nếu có
+    if (recognizedProduct.skinType && recommendations.length < 5) {
+      const skinType = recognizedProduct.skinType.toLowerCase();
+      const skinProducts = availableProducts.filter((product) => {
+        if (recommendations.some((r) => r.id === product.id)) return false;
+        return this.checkSkinTypeCompatibility(product, skinType) > 0.5;
+      });
+
+      skinProducts.slice(0, 5 - recommendations.length).forEach((product) => {
+        recommendations.push({
+          id: product.id,
+          name: product.name,
+          price: this.getFirstVariantPrice(product),
+          image: this.getValidImageUrl(product),
+          description: product.description || "",
+          category: product.category || "",
+          reason: `Phù hợp cho ${skinType}`,
+          confidence: 0.65,
+        });
+      });
+    }
+
+    // Loại bỏ duplicates và giới hạn số lượng
+    const uniqueRecs = this.removeDuplicateRecommendations(recommendations);
+    return uniqueRecs.slice(0, 5);
   }
 
   /**

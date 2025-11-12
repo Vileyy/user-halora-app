@@ -7,6 +7,7 @@ export interface ChatMessage {
   timestamp: Date;
   isTyping?: boolean;
   recommendedProducts?: ProductRecommendation[];
+  imageUri?: string; // URI của ảnh (local file URI hoặc base64 data URI)
 }
 
 export interface UserProfile {

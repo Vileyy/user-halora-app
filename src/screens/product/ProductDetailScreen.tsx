@@ -546,11 +546,23 @@ export default function ProductDetailScreen() {
             </View>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Xuất xứ</Text>
-              {/* <Text style={styles.specValue}>Hàn Quốc</Text> */}
+              <Text style={styles.specValue}>Việt Nam</Text>
             </View>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Dung tích</Text>
-              {/* <Text style={styles.specValue}>50ml</Text> */}
+              <Text style={styles.specValue}>
+                {(() => {
+                  // Luôn hiển thị tất cả các dung tích có sẵn từ variants
+                  if (product.variants && product.variants.length > 0) {
+                    const sizes = product.variants
+                      .map((v: any) => `${v.size}ml`)
+                      .join(", ");
+                    return sizes;
+                  }
+                  // Nếu không có variants, hiển thị thông báo
+                  return "Chưa có thông tin";
+                })()}
+              </Text>
             </View>
             <View style={styles.specRow}>
               <Text style={styles.specLabel}>Bảo hành</Text>
@@ -582,10 +594,22 @@ export default function ProductDetailScreen() {
                   },
                 }));
 
-                // Navigate to the recommended product
-                navigation.navigate("ProductDetailScreen", {
-                  product: recommendedProduct,
-                });
+                // Tìm full product object từ allProducts dựa trên ID
+                const fullProduct = allProducts.find(
+                  (p) => p.id === recommendedProduct.id
+                );
+
+                // Sử dụng push thay vì navigate để tạo screen mới trong stack
+                if (fullProduct) {
+                  navigation.push("ProductDetailScreen", {
+                    product: fullProduct,
+                  });
+                } else {
+                  // Fallback: nếu không tìm thấy, vẫn push với recommendedProduct
+                  navigation.push("ProductDetailScreen", {
+                    product: recommendedProduct,
+                  });
+                }
               }}
             />
           </View>
