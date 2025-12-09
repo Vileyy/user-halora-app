@@ -13,7 +13,6 @@ import {
   getProductReviews,
   getProductReviewSummary,
   forceRefreshProductSummary,
-  debugProductReviews,
   Review,
   ProductReviewSummary,
 } from "../services/reviewService";
@@ -141,30 +140,42 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
           getProductReviewSummary(productId),
         ]);
 
-        // console.log(`📊 Loaded reviews for product ${productId}:`, {
-        //   reviewsCount: reviewsData.length,
-        //   summaryTotal: summaryData?.totalReviews,
-        //   summaryAvg: summaryData?.averageRating,
-        // });
-
         setReviews(reviewsData);
-        setSummary(summaryData);
 
-        // Nếu có sự không khớp, debug và fix
-        if (summaryData && reviewsData.length !== summaryData.totalReviews) {
-          console.log(
-            `⚠️ Data mismatch detected! Reviews: ${reviewsData.length}, Summary: ${summaryData.totalReviews}`
-          );
+        // Nếu có reviews nhưng summary null hoặc không khớp, tự tính toán summary
+        if (reviewsData.length > 0) {
+          if (!summaryData || reviewsData.length !== summaryData.totalReviews) {
+            // Tự tính toán summary từ reviews thực tế
+            const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            let totalRating = 0;
 
-          // Debug để hiểu rõ vấn đề
-          await debugProductReviews(productId);
+            reviewsData.forEach((review) => {
+              totalRating += review.rating;
+              ratingDistribution[
+                review.rating as keyof typeof ratingDistribution
+              ]++;
+            });
 
-          // Reload summary sau khi debug fix
-          const updatedSummary = await getProductReviewSummary(productId);
-          setSummary(updatedSummary);
-          // console.log("✅ Summary after debug fix:", updatedSummary);
+            const calculatedSummary: ProductReviewSummary = {
+              averageRating: Number(
+                (totalRating / reviewsData.length).toFixed(1)
+              ),
+              totalReviews: reviewsData.length,
+              ratingDistribution,
+            };
+
+            setSummary(calculatedSummary);
+
+            // Cố gắng cập nhật summary trong database để lần sau không cần tính lại
+            try {
+              await forceRefreshProductSummary(productId);
+            } catch (syncError) {}
+          } else {
+            setSummary(summaryData);
+          }
         } else {
-          // console.log("✅ Review data is consistent!");
+          // Không có reviews
+          setSummary(summaryData);
         }
       } catch (error) {
         console.error("Error loading reviews:", error);
@@ -185,7 +196,11 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
     );
   }
 
-  if (!summary || summary.totalReviews === 0) {
+  // Kiểm tra cả summary và reviews để đảm bảo không bỏ lỡ đánh giá
+  const hasReviews =
+    reviews.length > 0 || (summary && summary.totalReviews > 0);
+
+  if (!hasReviews) {
     return (
       <View style={styles.summaryContainer}>
         <View style={styles.noReviewsInline}>
@@ -199,35 +214,51 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
   const visibleReviews = expanded ? reviews : reviews.slice(0, maxVisible);
   const hasMoreReviews = reviews.length > maxVisible;
 
+  // Tạo displaySummary để đảm bảo không bao giờ null khi render
+  // Nếu summary null nhưng có reviews, tự tính toán
+  const displaySummary: ProductReviewSummary =
+    summary ||
+    (() => {
+      const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let totalRating = 0;
+
+      reviews.forEach((review) => {
+        totalRating += review.rating;
+        ratingDistribution[review.rating as keyof typeof ratingDistribution]++;
+      });
+
+      return {
+        averageRating:
+          reviews.length > 0
+            ? Number((totalRating / reviews.length).toFixed(1))
+            : 0,
+        totalReviews: reviews.length,
+        ratingDistribution,
+      };
+    })();
+
   return (
     <View style={styles.container}>
       {/* Review Summary */}
       <View style={styles.summaryContainer}>
-        <StarRatingDisplay rating={summary.averageRating} size={16} />
+        <StarRatingDisplay rating={displaySummary.averageRating} size={16} />
         <Text style={styles.totalReviews}>
-          ({summary.totalReviews} đánh giá)
-          {/* Debug info - xóa sau khi fix */}
-          {reviews.length !== summary.totalReviews && (
-            <Text style={{ color: "red", fontSize: 10 }}>
-              {" "}
-              [Actual: {reviews.length}]
-            </Text>
-          )}
+          ({displaySummary.totalReviews} đánh giá)
         </Text>
       </View>
 
       {/* Rating Distribution (if expanded) */}
-      {expanded && summary.totalReviews > 0 && (
+      {expanded && displaySummary.totalReviews > 0 && (
         <View style={styles.distributionContainer}>
           <Text style={styles.distributionTitle}>Phân bổ đánh giá</Text>
           {[5, 4, 3, 2, 1].map((star) => {
             const count =
-              summary.ratingDistribution[
-                star as keyof typeof summary.ratingDistribution
+              displaySummary.ratingDistribution[
+                star as keyof typeof displaySummary.ratingDistribution
               ];
             const percentage =
-              summary.totalReviews > 0
-                ? (count / summary.totalReviews) * 100
+              displaySummary.totalReviews > 0
+                ? (count / displaySummary.totalReviews) * 100
                 : 0;
 
             return (
